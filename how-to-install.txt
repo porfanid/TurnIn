@@ -1,5 +1,7 @@
 On Windows:
 py -m pip install -r requirements.txt
+py turnin.py
 
 On Linux:
 python3 -m pip install -r requirements.txt
+python3 turnin.py
