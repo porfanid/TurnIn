@@ -1,5 +1,5 @@
 On Windows:
-py -m pip install -R requirements.txt
+py -m pip install -r requirements.txt
 
 On Linux:
-python3 -m pip install -R requirements.txt
+python3 -m pip install -r requirements.txt
