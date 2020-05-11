@@ -1,0 +1,3 @@
+sshtunnel
+paramiko
+PyQt5
