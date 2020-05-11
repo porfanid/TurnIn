@@ -1,22 +1,19 @@
+# importing sentry sdk for error reporting
+import sentry_sdk
+sentry_sdk.init("https://39a7dcc277c54f658ddf7c47deda2a9e@o238115.ingest.sentry.io/5236153")
+
+# ssh tunnel, socket and paramiko for the ssh and sftp commands for the turn in
 import sshtunnel
 import paramiko
-import os
 import socket
+
+# os for the path basename to get the name and other controls
+import os
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QLineEdit, QGridLayout, QMessageBox, QFileDialog, QInputDialog
 from PyQt5 import QtGui, QtCore
+
+# system, for the exit function and to get wether the platform is windows or linux
 from sys import platform, exit
-
-def check_ssh(server_ip, port=22):
-    try:
-        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        test_socket.connect((server_ip, port))
-    except Exception as ex:
-        # not up, log reason from ex if wanted
-        return False
-    else:
-        test_socket.close()
-    return True
-
 
 class LoginForm(QWidget):
 	def __init__(self,host,temp_dir):
@@ -126,6 +123,7 @@ if __name__ == '__main__':
 	if platform == "linux" or platform == "linux2":
 		if not os.geteuid() == 0:
 			print("only root can run this app")
+			exit(1)
 	proxy="scylla.cs.uoi.gr"
 	app = QApplication([])
 	form = LoginForm(proxy,"turnin")
