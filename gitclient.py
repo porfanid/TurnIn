@@ -22,5 +22,8 @@ else:
 	if upload:
 		execute("git add *")
 		message=input("Please enter a message for the upload: ")
-		execute("git commit -m '{}'".format(message))
+		try:
+			execute("git commit -m '{}'".format(message))
+		except:
+			pass
 		execute("git push master")
