@@ -26,4 +26,4 @@ else:
 			execute("git commit -m '{}'".format(message))
 		except:
 			pass
-		execute("git push master")
+		execute("git push")
