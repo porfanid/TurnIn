@@ -331,10 +331,6 @@ class LoginForm(QWidget):
 			msg.exec_()
 
 if __name__ == '__main__':
-	#if platform == "linux" or platform == "linux2":
-	#	if not os.geteuid() == 0:
-	#		print("only root can run this app")
-	#		exit(1)
 	proxy="scylla.cs.uoi.gr"
 	app = QApplication([])
 	form = LoginForm(proxy,"turnin")
