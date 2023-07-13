@@ -262,7 +262,7 @@ class LoginForm(QWidget):
 			ssh = paramiko.SSHClient()
 			ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())		
 			ssh.connect(proxy, username=username, password=password)
-			ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("ruptime")
+			ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("rupt")
 			servers=ssh_stdout.readlines()
 			ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("pwd")
 			home_dir=ssh_stdout.readlines()[0][:-1]
@@ -271,10 +271,13 @@ class LoginForm(QWidget):
 				server=server.split()
 				host_name=server[0]
 				host_is_up=(server[1]=="up")
-				if host_is_up and ("opti" in host_name):
+				if host_is_up and ("dl" in host_name):
 					host_to_connect=host_name
 					print("{}:is up:{}".format(host_name,host_is_up))
 					break
+			if not host_to_connect:
+				print("No host to connect has been found. Aborting")
+				exit(-1)
 			options = QFileDialog.Options()
 			files, _ = QFileDialog.getOpenFileNames(self,"Επιλέξτε τα αρχεία που θέλετε να παραδώσετε", "","All Files (*)", options=options)
 			transport = paramiko.Transport((self.host,22))
@@ -301,6 +304,7 @@ class LoginForm(QWidget):
 				if okPressed and text != '':
 					turn_in_command="cd {}&&yes|turnin {} {}".format(remote_dir,text, " ".join(remote_paths))
 					print(turn_in_command)
+					
 					with sshtunnel.open_tunnel(
 						(self.host, 22),
 						ssh_username=username,
@@ -327,10 +331,10 @@ class LoginForm(QWidget):
 			msg.exec_()
 
 if __name__ == '__main__':
-	if platform == "linux" or platform == "linux2":
-		if not os.geteuid() == 0:
-			print("only root can run this app")
-			exit(1)
+	#if platform == "linux" or platform == "linux2":
+	#	if not os.geteuid() == 0:
+	#		print("only root can run this app")
+	#		exit(1)
 	proxy="scylla.cs.uoi.gr"
 	app = QApplication([])
 	form = LoginForm(proxy,"turnin")
