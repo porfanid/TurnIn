@@ -1,4 +1,4 @@
 sshtunnel
 paramiko
-sentry-sdk==1.14.0
+sentry-sdk
 pyqt5
