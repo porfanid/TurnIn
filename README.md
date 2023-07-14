@@ -4,6 +4,8 @@ This is a program designed to be used with the turn in system at the [University
 
 ## Use the app
 
+### Through source code
+
 To use the app you need to have python installed on your system.
 
 After you have done this, you are going to have to install the dependencies. Yu can do this by going to the project using a terminal and the command cd and entering the following command:
@@ -26,6 +28,14 @@ python3 turnin.py
 
 And you start entering what the app asks you to enter. Pease refer to the screenshots for a more detailed preview.
 
+### Through the releases
+
+There is a release available for linux download available as an AppImage [here](https://github.com/porfanid/TurnIn/releases/download/2.0.0/turnin-client.AppImage).
+
+Steps to use:
+1. Download the package from the link.
+1. Right click on the file and go to properties![Properties](images/AppImage-properties.png)
+1. Enable the `Execute as a programm` option. After that, you have to double click on the programm and the app will start.
 
 ## Test turnin
 
