@@ -11,10 +11,6 @@ import socket
 # os for the path basename to get the name and other controls
 import os
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QLineEdit, QGridLayout, QMessageBox, QFileDialog, QInputDialog
-from PyQt5 import QtGui, QtCore
-
-# system, for the exit function and to get wether the platform is windows or linux
-from sys import platform, exit
 
 class LoginForm(QWidget):
 # Creates the login form and adds the function to call when the login button is pressed
