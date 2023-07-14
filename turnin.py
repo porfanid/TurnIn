@@ -91,7 +91,7 @@ class LoginForm(QWidget):
 				except:
 					print("Could not create directory.")
 				remote_paths=[]
-				for localpath in files:ψ
+				for localpath in files:
 					name=os.path.basename(localpath)
 					filepath = "{}{}".format(remote_dir,name)
 					try:
