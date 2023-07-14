@@ -1,5 +1,3 @@
-
-
 # importing sentry sdk for error reporting
 import sentry_sdk
 sentry_sdk.init("https://39a7dcc277c54f658ddf7c47deda2a9e@o238115.ingest.sentry.io/5236153")
@@ -93,7 +91,7 @@ class LoginForm(QWidget):
 				except:
 					print("Could not create directory.")
 				remote_paths=[]
-				for localpath in files:
+				for localpath in files:ψ
 					name=os.path.basename(localpath)
 					filepath = "{}{}".format(remote_dir,name)
 					try:
