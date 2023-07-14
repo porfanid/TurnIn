@@ -37,6 +37,8 @@ Steps to use:
 1. Right click on the file and go to properties![Properties](images/AppImage-properties.png)
 1. Enable the `Execute as a programm` option. After that, you have to double click on the programm and the app will start.
 
+More Info can be found [here](https://docs.appimage.org/introduction/quickstart.html)
+
 ## Test turnin
 
 You can test the turnin app by using the assignment: `test@cse74134`.
