@@ -1,5 +1,7 @@
 # TurnIn
 
+> Please add a star to the repository if you find it usefull.
+
 This is a program designed to be used with the turn in system at the [University of Ioannina](https://www.uoi.gr/).
 
 ## Use the app
