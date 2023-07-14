@@ -2,3 +2,4 @@ sshtunnel
 paramiko
 sentry-sdk
 pyqt5
+pyinstaller

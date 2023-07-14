@@ -17,18 +17,20 @@ pip install -r requirements.txt
 This will take some time, as it needs to check the dependencies for the GUI and make sure that everything has been installed successfully
 
 
-Every time you need to use the app, you are going to have to run one of these commands based on the operating system you have installd on your computer:
+To install the App, open a command line interface, go to the location where you saved the folder, and run one of these commands 
+based on the OS you have installed on your Computer:
 
 On Windows:
 ```bash
-py turnin.py
+py installer.py
 ```
 On Linux:
 ```bash
-python3 turnin.py
+python3 installer.py
 ```
 
-And you start entering what the app asks you to enter. Pease refer to the screenshots for a more detailed preview.
+Follow the Instructions of the Installer, and then you can run the executable `.exe` file whenever you want to complete a turnin.
+Please refer to the screenshots for a more detailed preview.
 
 ### Through the releases
 

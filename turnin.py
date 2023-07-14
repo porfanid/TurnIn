@@ -10,6 +10,10 @@ import socket
 import os
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QLineEdit, QGridLayout, QMessageBox, QFileDialog, QInputDialog
 
+from PyQt5 import QtGui, QtCore
+# system, for the exit function and to get wether the platform is windows or linux
+from sys import platform, exit
+
 class LoginForm(QWidget):
 # Creates the login form and adds the function to call when the login button is pressed
 	def __init__(self,host,temp_dir):
@@ -21,16 +25,16 @@ class LoginForm(QWidget):
 
 		layout = QGridLayout()
 
-		label_name = QLabel('<font size="4"> Όνομα Χρήστη </font>')
+		label_name = QLabel('<font size="4"> Όνομα Χρήστη: </font>')
 		self.lineEdit_username = QLineEdit()
-		self.lineEdit_username.setPlaceholderText('Παρακαλώ εισάγετε το όνομα χρήστη σας')
+		self.lineEdit_username.setPlaceholderText('Παρακαλώ εισάγετε το όνομα χρήστη σας.')
 		layout.addWidget(label_name, 0, 0)
 		layout.addWidget(self.lineEdit_username, 0, 1)
 
-		label_password = QLabel('<font size="4"> Κωδικός Πρόσβασης </font>')
+		label_password = QLabel('<font size="4"> Κωδικός Πρόσβασης: </font>')
 		self.lineEdit_password = QLineEdit()
 		self.lineEdit_password.setEchoMode(QLineEdit.Password)
-		self.lineEdit_password.setPlaceholderText('Παρακαλώ εισάγετε τον κωδικό πρόσβασή σας')
+		self.lineEdit_password.setPlaceholderText('Παρακαλώ εισάγετε τον κωδικό πρόσβασής σας.')
 		layout.addWidget(label_password, 1, 0)
 		layout.addWidget(self.lineEdit_password, 1, 1)
 
@@ -44,43 +48,48 @@ class LoginForm(QWidget):
 		self.setLayout(layout)
 
 	def check_password(self):
-# creates the message object and reads the username and the password from the textboxes
+		# creates the message object and reads the username and the password from the textboxes
 		msg = QMessageBox()
 		username = self.lineEdit_username.text()
 		password = self.lineEdit_password.text()
-# tries to connect to ssh server and if not, shows the wr
+		
+		# tries to connect to ssh server and if not, shows the wr
 		try:
 			ssh = paramiko.SSHClient()
 			ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())		
 			ssh.connect(proxy, username=username, password=password)
-			ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("rupt")
+			_, ssh_stdout, ssh_stderr = ssh.exec_command("rupt")
 			servers=ssh_stdout.readlines()
-			ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("pwd")
+			_, ssh_stdout, ssh_stderr = ssh.exec_command("pwd")
 			home_dir=ssh_stdout.readlines()[0][:-1]
-			host_to_connect=None
+			host_to_connect = None
+			
 			for server in servers:
 				server=server.split()
 				host_name=server[0]
 				host_is_up=(server[1]=="up")
 				if host_is_up and ("dl" in host_name):
 					host_to_connect=host_name
-					print("{}:is up:{}".format(host_name,host_is_up))
+					print(f"{host_name} -> is up: {host_is_up}")
 					break
+				
 			if not host_to_connect:
-				print("No host to connect has been found. Aborting")
+				print("No host to connect to has been found. Aborting...")
 				exit(-1)
+				
+         
 			options = QFileDialog.Options()
-			files, _ = QFileDialog.getOpenFileNames(self,"Επιλέξτε τα αρχεία που θέλετε να παραδώσετε", "","All Files (*)", options=options)
+			files, _ = QFileDialog.getOpenFileNames(self,"Επιλέξτε τα αρχεία που θέλετε να παραδώσετε:", "","All Files (*)", options=options)
 			transport = paramiko.Transport((self.host,22))
 			transport.connect(None,username,password)
 			sftp = paramiko.SFTPClient.from_transport(transport)
 			if files:
-				remote_dir="{}/{}/".format(home_dir,self.temp_dir)
+				remote_dir=f"{home_dir}/{self.temp_dir}/"
 				print(remote_dir)
 				try:
 					sftp.mkdir(remote_dir)
 				except:
-					print("Could not create directory")
+					print("Could not create directory.")
 				remote_paths=[]
 				for localpath in files:ψ
 					name=os.path.basename(localpath)
@@ -88,12 +97,12 @@ class LoginForm(QWidget):
 					try:
 						sftp.put(localpath,filepath)
 						remote_paths.append(name)
-						print("localpath was successfulle uploaded to server")
+						print("Localpath was successfully uploaded to server.")
 					except Exception as e:
 						print("Could not upload file: "+str(e))
-				text, okPressed = QInputDialog.getText(self, "Άσκηση","Ο κωδικός της άσκησης:", QLineEdit.Normal, "")
+				text, okPressed = QInputDialog.getText(self, "Άσκηση:","Ο κωδικός της άσκησης:", QLineEdit.Normal, "")
 				if okPressed and text != '':
-					turn_in_command="cd {}&&yes|turnin {} {}".format(remote_dir,text, " ".join(remote_paths))
+					turn_in_command = f"cd {remote_dir}&&yes|turnin {text} {' '.join(remote_paths)}"
 					print(turn_in_command)
 					
 					with sshtunnel.open_tunnel(
@@ -102,24 +111,25 @@ class LoginForm(QWidget):
 						ssh_password=password,
 						remote_bind_address=(host_to_connect, 22),
 						local_bind_address=('0.0.0.0', 10022)
-					) as tunnel:
+					) as _:
 						client = paramiko.SSHClient()
 						client.load_system_host_keys()
 						client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 						client.connect('127.0.0.1', 10022, username=username, password=password)
-						ssh_stdin, ssh_stdout, ssh_stderr = client.exec_command(turn_in_command)
-						client.exec_command("rm -R {}".format(remote_dir))
-						msg.setText("{}\n\n{}".format("".join(ssh_stdout.readlines()),"".join(ssh_stderr.readlines())))
+						_, ssh_stdout, ssh_stderr = client.exec_command(turn_in_command)
+						client.exec_command(f"rm -R {remote_dir}")
+						msg.setText(f"{''.join(ssh_stdout.readlines())}\n\n{''.join(ssh_stderr.readlines())}")
 						msg.exec_()
 						
 						client.close()
 			else:
-				msg.setText('No Files were selected. Cannot continue with the turn in')
+				msg.setText('No Files were selected! Cannot continue with the turn in.')
 				msg.exec_()
 				app.quit()
 		except paramiko.AuthenticationException:
-			msg.setText('Wrong Password. Please try again')
+			msg.setText('Wrong Password! Please try again.')
 			msg.exec_()
+	
 
 if __name__ == '__main__':
 	proxy="scylla.cs.uoi.gr"
