@@ -6,6 +6,24 @@ This is a program designed to be used with the turn in system at the [University
 
 ## Use the app
 
+### Through the releases
+
+#### windows
+
+There is a release available for windows download available as an exe file [here](https://github.com/porfanid/TurnIn/releases/download/2.0.0/TurninApp.exe).
+
+All you have to do is download and run this file.
+
+#### Linux
+There is a release available for linux download available as an AppImage [here](https://github.com/porfanid/TurnIn/releases/download/2.0.0/turnin-client.AppImage).
+
+Steps to use:
+1. Download the package from the link.
+1. Right click on the file and go to properties![Properties](images/AppImage-properties.png)
+1. Enable the `Execute as a programm` option. After that, you have to double click on the programm and the app will start.
+
+More Info can be found [here](https://docs.appimage.org/introduction/quickstart.html)
+
 ### Through source code
 
 To use the app you need to have python installed on your system.
@@ -31,17 +49,6 @@ python3 installer.py
 
 Follow the Instructions of the Installer, and then you can run the executable `.exe` file whenever you want to complete a turnin.
 Please refer to the screenshots for a more detailed preview.
-
-### Through the releases
-
-There is a release available for linux download available as an AppImage [here](https://github.com/porfanid/TurnIn/releases/download/2.0.0/turnin-client.AppImage).
-
-Steps to use:
-1. Download the package from the link.
-1. Right click on the file and go to properties![Properties](images/AppImage-properties.png)
-1. Enable the `Execute as a programm` option. After that, you have to double click on the programm and the app will start.
-
-More Info can be found [here](https://docs.appimage.org/introduction/quickstart.html)
 
 ## Test turnin
 
