@@ -29,11 +29,14 @@ You need to download one of the following files:
   2. Run it and you are good to go!
 
 ### Source
-  1. Run the following command to download the dependencies:
+  1. Run the following command using the terminal to download the dependencies:
+
     ```bash
       pip install -r requirements.txt
     ```
-    2. After the requirements have been installed, all you need is to start the programm by typing
+    
+  1. After the requirements have been installed, all you need is to start the programm by typing
+
     ```bash
     python turnin.py
     ```
