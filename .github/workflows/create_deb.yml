@@ -69,6 +69,10 @@ jobs:
           echo "* Mon Aug 23 2023 Your Name <your.email@example.com> - 1.0-1" >> my-package.spec
           echo "- Initial package" >> my-package.spec
 
+      - name: Create source archive
+        run: |
+          tar czvf my-package-1.0.tar.gz deb-package
+      
       - name: Prepare RPM build directory
         run: |
           mkdir -p ~/rpmbuild/SOURCES
