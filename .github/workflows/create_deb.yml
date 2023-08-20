@@ -66,7 +66,7 @@ jobs:
           echo "/usr/bin/turnin.py" >> my-package.spec
           echo "" >> my-package.spec
           echo "%changelog" >> my-package.spec
-          echo "* Mon Aug 23 2023 Your Name <your.email@example.com> - 1.0-1" >> my-package.spec
+          echo "* Mon Aug 21 2023 Pavlos Orfanidis <pavlos@orfanidis.net.gr> - 1.0-1" >> my-package.spec
           echo "- Initial package" >> my-package.spec
 
       - name: Create source archive
