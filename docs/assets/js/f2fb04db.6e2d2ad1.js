@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkturn_in=self.webpackChunkturn_in||[]).push([[8935],{5917:e=>{e.exports=JSON.parse('{"permalink":"/TurnIn/blog/tags/facebook","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Blog","blogTitle":"Blog"}')}}]);
