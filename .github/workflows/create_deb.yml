@@ -1,9 +1,13 @@
 name: Create Packages and Release
 
+#on:
+#  push:
+#    tags:
+#      - '*'
 on:
   push:
-    tags:
-      - '*'
+      branches:
+        - main  # Change this to your default branch name
 
 jobs:
   build-and-release:
@@ -53,7 +57,7 @@ jobs:
           echo "This is an example RPM package." >> my-package.spec
           echo "" >> my-package.spec
           echo "%prep" >> my-package.spec
-          echo "%setup -q" >> my-package.spec
+          echo "%setup -q -c -n %{name}-%{version}" >> my-package.spec
           echo "" >> my-package.spec
           echo "%install" >> my-package.spec
           echo "rm -rf %{buildroot}" >> my-package.spec
@@ -66,13 +70,13 @@ jobs:
           echo "/usr/bin/turnin.py" >> my-package.spec
           echo "" >> my-package.spec
           echo "%changelog" >> my-package.spec
-          echo "* Mon Aug 21 2023 Pavlos Orfanidis <pavlos@orfanidis.net.gr> - 1.0-1" >> my-package.spec
+          echo "* Mon Aug 21 2023 Your Name <your.email@example.com> - 1.0-1" >> my-package.spec
           echo "- Initial package" >> my-package.spec
 
       - name: Create source archive
         run: |
           tar czvf my-package-1.0.tar.gz deb-package
-      
+
       - name: Prepare RPM build directory
         run: |
           mkdir -p ~/rpmbuild/SOURCES
