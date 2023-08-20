@@ -1,0 +1,54 @@
+name: Create Debian Package and Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Prepare Debian package directory
+        run: |
+          mkdir -p deb-package/DEBIAN
+          echo "Package: my-python-app" >> deb-package/DEBIAN/control
+          echo "Version: 1.0" >> deb-package/DEBIAN/control
+          echo "Architecture: all" >> deb-package/DEBIAN/control
+          echo "Maintainer: Your Name <your.email@example.com>" >> deb-package/DEBIAN/control
+          echo "Description: My Python App" >> deb-package/DEBIAN/control
+
+          mkdir -p deb-package/usr/bin
+          cp turnin.py deb-package/usr/bin
+          chmod +x deb-package/usr/bin/turnin.py
+
+      - name: Create post-install script
+        run: |
+          echo "#!/bin/bash" > deb-package/DEBIAN/postinst
+          echo "pip install -r /usr/bin/turnin.py/requirements.txt" >> deb-package/DEBIAN/postinst
+          chmod +x deb-package/DEBIAN/postinst
+
+      - name: Build Debian package
+        run: |
+          dpkg-deb --build deb-package
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./deb-package.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
