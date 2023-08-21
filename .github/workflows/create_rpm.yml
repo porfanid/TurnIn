@@ -45,9 +45,12 @@ jobs:
           echo '%files' >> rpmbuild/SPECS/turnin.spec
           echo '%defattr(-,root,root)' >> rpmbuild/SPECS/turnin.spec
           echo '/usr/bin/turnin.py' >> rpmbuild/SPECS/turnin.spec
+          echo '/usr/share/icons/cse.logo.png' >> rpmbuild/SPECS/turnin.spec  # Icon file
 
       - name: Copy source files
-        run: cp turnin.py rpmbuild/SOURCES/
+        run: |
+          cp turnin.py rpmbuild/SOURCES/
+          cp cse.logo.png rpmbuild/SOURCES/  # Icon file
 
       - name: Build RPM package
         run: rpmbuild -ba rpmbuild/SPECS/turnin.spec
