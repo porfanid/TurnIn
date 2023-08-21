@@ -2,7 +2,7 @@ name: Create Release
 
 on:
   workflow_run:
-    workflows: ["Build Debian Package", "Build Windows EXE"]
+    workflows: ["Build Debian Package", "Build Windows EXE", "Build RPM Package"]
 
 jobs:
   create-release:
@@ -12,6 +12,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt update
+          sudo apt install gh
+
       - name: Set up Git
         run: git config --global user.email "your@email.com" && git config --global user.name "Your Name"
 
@@ -20,24 +27,14 @@ jobs:
           release_name="v${{ github.run_number }}"
           release_tag="v${{ github.run_number }}"
           body="Release created automatically from workflows"
-          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -d '{
-            "tag_name": "'"$release_tag"'",
-            "target_commitish": "master",
-            "name": "'"$release_name"'",
-            "body": "'"$body"'",
-            "draft": false,
-            "prerelease": false
-          }' "https://api.github.com/repos/${{ github.repository }}/releases")
-          release_id=$(echo $response | jq -r ".id")
+          gh release create "$release_tag" ./turnin.exe ./deb-package.deb --title "$release_name" --notes "$body"
 
-          for workflow_run_id in $(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs" | jq -r '.workflow_runs[].id'); do
-            for artifact in $(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${workflow_run_id}/artifacts" | jq -r '.artifacts[].id'); do
-              curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
-                -X POST "https://uploads.github.com/repos/${{ github.repository }}/releases/${release_id}/artifacts?name=$artifact" \
-                --data-binary @"$artifact"
+      - name: Upload Additional Artifacts
+        run: |
+          for workflow_run_id in $(gh workflow run list -w "Build Debian Package, Build Windows EXE, Build RPM Package" | grep -oP '(?<=id:\s)\d+'); do
+            for artifact in $(gh run download $workflow_run_id --list-artifacts | grep -oP '(?<=- name: ).*'); do
+              if [ "$artifact" != "turnin.exe" ] && [ "$artifact" != "deb-package.deb" ]; then
+                gh release upload "$release_tag" "$artifact" --clobber
+              fi
             done
           done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
