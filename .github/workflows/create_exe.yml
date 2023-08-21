@@ -34,4 +34,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: turnin.exe
-          path: $GITHUB_WORKSPACE/turnin.exe
+          path: turnin.exe
