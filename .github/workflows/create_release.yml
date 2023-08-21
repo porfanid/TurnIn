@@ -1,0 +1,40 @@
+name: Create Release
+
+on:
+  workflow_run:
+    workflows: ["Build Debian Package", "Build Windows EXE", "Build RPM Package"]
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Git
+        run: git config --global user.email "pavlos@orfanidis.net.gr" && git config --global user.name "Pavlos Orfanidis"
+
+      - name: Create Release
+        run: |
+          release_name="v${{ github.run_number }}"
+          release_tag="v${{ github.run_number }}"
+          body="Release created automatically from workflows"
+          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -d '{
+            "tag_name": "'"$release_tag"'",
+            "target_commitish": "master",
+            "name": "'"$release_name"'",
+            "body": "'"$body"'",
+            "draft": false,
+            "prerelease": false
+          }' "https://api.github.com/repos/${{ github.repository }}/releases")
+          release_id=$(echo $response | jq -r ".id")
+
+          for artifact in $(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" | jq -r '.artifacts[].id'); do
+            curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
+              -X POST "https://uploads.github.com/repos/${{ github.repository }}/releases/${release_id}/artifacts?name=$artifact" \
+              --data-binary @"$artifact"
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
