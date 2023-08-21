@@ -34,6 +34,7 @@ jobs:
           mkdir -p deb-package/usr/bin
           cp turnin.py deb-package/usr/bin
           chmod +x deb-package/usr/bin/turnin.py
+          cp requirements.txt deb-package/usr/bin
 
           mkdir -p deb-package/usr/share/applications
           echo "[Desktop Entry]" >> deb-package/usr/share/applications/turnin.desktop
@@ -48,7 +49,7 @@ jobs:
       - name: Create post-install script
         run: |
           echo "#!/bin/bash" > deb-package/DEBIAN/postinst
-          echo "pip install -r /usr/bin/turnin.py/requirements.txt" >> deb-package/DEBIAN/postinst
+          echo "pip install -r /usr/bin/requirements.txt" >> deb-package/DEBIAN/postinst
           chmod +x deb-package/DEBIAN/postinst
 
       - name: Build Debian package
