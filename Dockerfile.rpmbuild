@@ -1,7 +1,7 @@
 FROM fedora:latest
 
 # Install necessary dependencies
-RUN dnf install -y rpm-build python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
+RUN dnf install -y rpm-build python3-sshtunnel python3-paramiko python3-sentry-sdk PyQt5
 
 # Create RPM build directories
 RUN mkdir -p /rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
@@ -16,7 +16,7 @@ RUN echo 'Version: 1.0' >> /rpmbuild/SPECS/turnin.spec
 RUN echo 'Release: 1' >> /rpmbuild/SPECS/turnin.spec
 RUN echo 'Summary: TurnIn App' >> /rpmbuild/SPECS/turnin.spec
 RUN echo 'License: MIT' >> /rpmbuild/SPECS/turnin.spec
-RUN echo 'BuildRequires: python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5' >> /rpmbuild/SPECS/turnin.spec
+RUN echo 'BuildRequires: python3-sshtunnel python3-paramiko python3-sentry-sdk PyQt5' >> /rpmbuild/SPECS/turnin.spec
 RUN echo '' >> /rpmbuild/SPECS/turnin.spec
 RUN echo '%description' >> /rpmbuild/SPECS/turnin.spec
 RUN echo 'TurnIn App' >> /rpmbuild/SPECS/turnin.spec
