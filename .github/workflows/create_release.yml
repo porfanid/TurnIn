@@ -2,7 +2,7 @@ name: Create Release
 
 on:
   workflow_run:
-    workflows: ["Build Debian Package", "Build Windows EXE", "Build RPM Package"]
+    workflows: ["Build Debian Package", "Build Windows EXE"]
 
 jobs:
   create-release:
