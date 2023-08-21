@@ -18,10 +18,6 @@ jobs:
         with:
           python-version: 3.8
 
-      - name: Install Python dependencies
-        run: |
-          pip install -r requirements.txt
-
       - name: Prepare Debian package directory
         run: |
           mkdir -p deb-package/DEBIAN
@@ -30,11 +26,11 @@ jobs:
           echo "Architecture: all" >> deb-package/DEBIAN/control
           echo "Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>" >> deb-package/DEBIAN/control
           echo "Description: TurnIn App" >> deb-package/DEBIAN/control
+          echo "Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt5, python3-pyinstaller" >> deb-package/DEBIAN/control  # Specify dependencies
 
           mkdir -p deb-package/usr/bin
           cp turnin.py deb-package/usr/bin
           chmod +x deb-package/usr/bin/turnin.py
-          cp requirements.txt deb-package/usr/bin
 
           mkdir -p deb-package/usr/share/applications
           echo "[Desktop Entry]" >> deb-package/usr/share/applications/turnin.desktop
@@ -45,12 +41,6 @@ jobs:
 
           mkdir -p deb-package/usr/share/icons
           cp cse.logo.png deb-package/usr/share/icons
-
-      - name: Create post-install script
-        run: |
-          echo "#!/bin/bash" > deb-package/DEBIAN/postinst
-          echo "pip install -r /usr/bin/requirements.txt" >> deb-package/DEBIAN/postinst
-          chmod +x deb-package/DEBIAN/postinst
 
       - name: Build Debian package
         run: |
