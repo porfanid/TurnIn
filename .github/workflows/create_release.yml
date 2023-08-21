@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Set up Git
-        run: git config --global user.email "pavlos@orfanidis.net.gr" && git config --global user.name "Pavlos Orfanidis"
+        run: git config --global user.email "your@email.com" && git config --global user.name "Your Name"
 
       - name: Create Release
         run: |
@@ -30,11 +30,14 @@ jobs:
           }' "https://api.github.com/repos/${{ github.repository }}/releases")
           release_id=$(echo $response | jq -r ".id")
 
-          for artifact in $(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" | jq -r '.artifacts[].id'); do
-            curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
-              -X POST "https://uploads.github.com/repos/${{ github.repository }}/releases/${release_id}/artifacts?name=$artifact" \
-              --data-binary @"$artifact"
+          for workflow_run_id in $(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs" | jq -r '.workflow_runs[].id'); do
+            for artifact in $(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${workflow_run_id}/artifacts" | jq -r '.artifacts[].id'); do
+              curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
+                -X POST "https://uploads.github.com/repos/${{ github.repository }}/releases/${release_id}/artifacts?name=$artifact" \
+                --data-binary @"$artifact"
+            done
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
