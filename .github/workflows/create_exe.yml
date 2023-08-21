@@ -1,0 +1,39 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+
+      - name: Build Windows EXE
+        run: |
+          pyinstaller --onefile turnin.py  # Replace with the actual name of your Python script
+
+      - name: Copy EXE to project root
+        run: |
+          cp dist/turnin.exe ./turnin.exe
+
+      - name: Push EXE file to GitHub release
+        run: |
+          git config --local user.email "your@email.com"
+          git config --local user.name "Your Name"
+          git add turnin.exe
+          git commit -m "Add TurnIn Windows EXE"
+          git push origin HEAD
