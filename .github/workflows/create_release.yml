@@ -12,15 +12,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-          sudo apt-add-repository "deb [arch=amd64] https://cli.github.com/packages stable main"
-          sudo apt update
-          sudo apt install gh
-
-
-
       - name: Set up Git
         run: git config --global user.email "your@email.com" && git config --global user.name "Your Name"
 
@@ -29,14 +20,36 @@ jobs:
           release_name="v${{ github.run_number }}"
           release_tag="v${{ github.run_number }}"
           body="Release created automatically from workflows"
-          gh release create "$release_tag" ./turnin.exe ./deb-package.deb --title "$release_name" --notes "$body"
 
-      - name: Upload Additional Artifacts
-        run: |
+          response=$(curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\": \"$release_tag\", \"name\": \"$release_name\", \"body\": \"$body\"}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases")
+
+          upload_url=$(echo "$response" | jq -r .upload_url | sed 's/{.*//')
+          echo "Release uploaded to $upload_url"
+
+          # Upload main artifacts
+          for artifact in turnin.exe deb-package.deb; do
+            echo "Uploading $artifact"
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$artifact" \
+              "$upload_url/assets?name=$artifact"
+          done
+
+          # Upload additional artifacts
           for workflow_run_id in $(gh workflow run list -w "Build Debian Package, Build Windows EXE, Build RPM Package" | grep -oP '(?<=id:\s)\d+'); do
             for artifact in $(gh run download $workflow_run_id --list-artifacts | grep -oP '(?<=- name: ).*'); do
               if [ "$artifact" != "turnin.exe" ] && [ "$artifact" != "deb-package.deb" ]; then
-                gh release upload "$release_tag" "$artifact" --clobber
+                echo "Uploading $artifact"
+                curl -X POST \
+                  -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                  -H "Content-Type: application/octet-stream" \
+                  --data-binary "@$artifact" \
+                  "$upload_url/assets?name=$artifact"
               fi
             done
           done
