@@ -2,8 +2,8 @@ name: Create Debian Package and Push to Repository
 
 on:
   push:
-      branches:
-        - master  # Change this to your default branch name
+    branches:
+      - master
 
 jobs:
   build-and-push:
@@ -39,7 +39,11 @@ jobs:
           echo "[Desktop Entry]" >> deb-package/usr/share/applications/turnin.desktop
           echo "Name=TurnIn" >> deb-package/usr/share/applications/turnin.desktop
           echo "Exec=python3 /usr/bin/turnin.py" >> deb-package/usr/share/applications/turnin.desktop
+          echo "Icon=/usr/share/icons/cse.logo.png" >> deb-package/usr/share/applications/turnin.desktop
           echo "Type=Application" >> deb-package/usr/share/applications/turnin.desktop
+
+          mkdir -p deb-package/usr/share/icons
+          cp cse.logo.png deb-package/usr/share/icons
 
       - name: Create post-install script
         run: |
