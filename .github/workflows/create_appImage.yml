@@ -39,6 +39,7 @@ jobs:
           echo "Exec=turnin.py" >> AppDir/usr/share/applications/turnin.desktop
           echo "Icon=turnin" >> AppDir/usr/share/applications/turnin.desktop
           echo "Type=Application" >> AppDir/usr/share/applications/turnin.desktop
+          echo "Categories=Utility;" >> AppDir/usr/share/applications/turnin.desktop
 
           mkdir -p AppDir/usr/share/icons
           cp cse.logo.png AppDir/usr/share/icons/turnin.png
