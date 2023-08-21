@@ -1,6 +1,7 @@
 FROM centos:8
 
 # Install necessary dependencies
+RUN dnf install -y python-pip
 RUN pip install -r requirements.txt
 
 # Create RPM build directories
