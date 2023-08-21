@@ -41,9 +41,12 @@ jobs:
 
           mkdir -p deb-package/usr/share/icons
           cp cse.logo.png deb-package/usr/share/icons
-      - name: Upload EXE artifact
+
+      - name: Build Debian package
+        run: dpkg-deb --build deb-package
+
+      - name: Upload DEB artifact
         uses: actions/upload-artifact@v2
         with:
           name: deb-package.deb
           path: deb-package.deb
-
