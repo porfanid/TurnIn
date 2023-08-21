@@ -7,7 +7,7 @@ RUN dnf install -y rpm-build python3-sshtunnel python3-paramiko python3-sentry-s
 RUN mkdir -p /rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
 # Copy source files and icon to the Docker container
-COPY . /rpmbuild/SOURCES/
+COPY turnin.py /rpmbuild/SOURCES/
 WORKDIR /rpmbuild/SOURCES
 
 # Create the RPM spec file
