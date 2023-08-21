@@ -50,6 +50,7 @@ jobs:
           echo 'HERE="$(dirname "$(readlink -f "${0}")")"' >> AppDir/AppRun
           echo 'exec "${HERE}/usr/bin/python3" "${HERE}/usr/bin/turnin.py" "$@"' >> AppDir/AppRun
           chmod +x AppDir/AppRun
+          cp AppDir/AppRun AppRun
 
       - name: Download and install linuxdeploy
         run: |
