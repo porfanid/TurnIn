@@ -20,8 +20,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
 
       - name: Install FUSE
         run: |
