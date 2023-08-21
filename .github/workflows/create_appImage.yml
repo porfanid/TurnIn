@@ -38,7 +38,7 @@ jobs:
           echo "[Desktop Entry]" >> AppDir/turnin.desktop
           echo "Name=TurnIn" >> AppDir/turnin.desktop
           echo "Exec=AppRun" >> AppDir/turnin.desktop
-          echo "Icon=/venv/bin/turnin.png" >> AppDir/turnin.desktop
+          echo "Icon=/venv/bin/turnin" >> AppDir/turnin.desktop
           echo "Type=Application" >> AppDir/turnin.desktop
           echo "Categories=Utility;" >> AppDir/turnin.desktop
 
