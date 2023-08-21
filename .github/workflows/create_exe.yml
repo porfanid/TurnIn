@@ -25,7 +25,7 @@ jobs:
 
       - name: Build Windows EXE
         run: |
-          pyinstaller --onefile turnin.py  # Replace with the actual name of your Python script
+          pyinstaller --onefile --icon=cse.logo.ico turnin.py  # Replace with the actual name of your Python script
 
       - name: Copy EXE to project root
         run: |
