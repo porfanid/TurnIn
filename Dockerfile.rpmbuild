@@ -1,7 +1,7 @@
 FROM centos:8
 
 # Install necessary dependencies
-RUN yum install -y rpm-build rpm-build python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
+RUN pip install -r requirements.txt
 
 # Create RPM build directories
 RUN mkdir -p /rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
