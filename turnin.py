@@ -46,6 +46,25 @@ class LoginForm(QWidget):
 		self.lineEdit_password.returnPressed.connect(self.check_password)
 		self.lineEdit_username.returnPressed.connect(self.check_password)
 		self.setLayout(layout)
+	
+	def getFiles(self):
+		options = QFileDialog.Options()
+		files, _ = QFileDialog.getOpenFileNames(self,"Επιλέξτε τα αρχεία που θέλετε να παραδώσετε:", "","All Files (*)", options=options)
+		while True:
+			if files:
+			# Ask for confirmation
+				confirm_msg = QMessageBox()
+				confirm_msg.setIcon(QMessageBox.Question)
+				filelist="\n".join(files)
+				confirm_msg.setText("Are you sure you want to upload the selected files?\n\n"+filelist)
+
+				confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+				confirm_response = confirm_msg.exec_()
+
+				if confirm_response == QMessageBox.Yes:
+					break
+				files, _ = QFileDialog.getOpenFileNames(self,"Επιλέξτε τα αρχεία που θέλετε να παραδώσετε:", "","All Files (*)", options=options)
+		return files
 
 	def check_password(self):
 		# creates the message object and reads the username and the password from the textboxes
@@ -76,10 +95,10 @@ class LoginForm(QWidget):
 			if not host_to_connect:
 				print("No host to connect to has been found. Aborting...")
 				exit(-1)
-				
-         
-			options = QFileDialog.Options()
-			files, _ = QFileDialog.getOpenFileNames(self,"Επιλέξτε τα αρχεία που θέλετε να παραδώσετε:", "","All Files (*)", options=options)
+
+			
+			files = self.getFiles()
+			
 			transport = paramiko.Transport((self.host,22))
 			transport.connect(None,username,password)
 			sftp = paramiko.SFTPClient.from_transport(transport)
