@@ -46,8 +46,9 @@ jobs:
 
           # Add the shebang line to AppRun
           echo "#!/bin/bash" >> AppDir/AppRun
-          echo 'HERE="$(dirname "$(readlink -f "${0}")")"' >> AppDir/AppRun
-          echo 'exec "${HERE}/usr/bin/python3" "${HERE}/usr/bin/turnin.py" "$@"' >> AppDir/AppRun
+          echo 'APPDIR=$(dirname "$(readlink -f "$0")")' >> AppDir/AppRun
+          echo 'PYTHON="$APPDIR/venv/bin/python"' >> AppDir/AppRun
+          echo '$PYTHON "$APPDIR/venv/bin/turnin.py"' >> AppDir/AppRun
           chmod +x AppDir/AppRun
 
       - name: Download and install linuxdeploy
