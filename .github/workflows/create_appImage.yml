@@ -40,6 +40,7 @@ jobs:
           echo "Icon=turnin" >> AppDir/usr/share/applications/turnin.desktop
           echo "Type=Application" >> AppDir/usr/share/applications/turnin.desktop
           echo "Categories=Utility;" >> AppDir/usr/share/applications/turnin.desktop
+          
 
           mkdir -p AppDir/usr/share/icons
           cp cse.logo.png AppDir/usr/share/icons/turnin.png
@@ -52,7 +53,7 @@ jobs:
 
       - name: Create AppImage
         run: |
-          linuxdeploy --appdir AppDir --output appimage
+          ARCH=x86_64 linuxdeploy --appdir AppDir --output appimage  # Specify the architecture
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v2
