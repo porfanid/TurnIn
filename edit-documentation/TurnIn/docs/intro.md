@@ -27,14 +27,8 @@ You need to download one of the following files:
 
   After that there is the TurnIn app installed on your computer
   
-  #### App Image
-
-  Download the file [here](https://github.com/porfanid/TurnIn/releases/download/2.0.0/turnin-client.AppImage)
-  1. In order for you to run the app you downloaded you will have to make sure that the app is executable:![executabe](./images/AppImage-properties.png)
-  1. Double click on the program and you are good to go!
-
 ### Windows
-  1. Download the [exe](https://github.com/porfanid/TurnIn/releases/download/2.0.0/turnin.exe) file
+  1. Download the [exe](https://github.com/porfanid/TurnIn/releases/download/3.0.0/turnin.exe) file
   2. Run it and you are good to go!
 
 ### Source
