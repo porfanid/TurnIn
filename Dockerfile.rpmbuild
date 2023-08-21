@@ -8,6 +8,7 @@ RUN mkdir -p /rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
 # Copy source files and icon to the Docker container
 COPY turnin.py /rpmbuild/SOURCES/
+COPY cse.logo.png /rpmbuild/SOURCES/  # Copy the icon file
 WORKDIR /rpmbuild/SOURCES
 
 # Create the RPM spec file
@@ -25,7 +26,7 @@ RUN echo '%prep' >> /rpmbuild/SPECS/turnin.spec
 RUN echo '' >> /rpmbuild/SPECS/turnin.spec
 RUN echo '%install' >> /rpmbuild/SPECS/turnin.spec
 RUN echo 'mkdir -p %{buildroot}/usr/bin' >> /rpmbuild/SPECS/turnin.spec
-RUN echo 'cp turnin.py %{buildroot}/usr/bin/' >> /rpmbuild/SPECS/turnin.spec
+RUN echo 'cp /rpmbuild/SOURCES/turnin.py %{buildroot}/usr/bin/' >> /rpmbuild/SPECS/turnin.spec  # Adjust the path
 RUN echo 'chmod +x %{buildroot}/usr/bin/turnin.py' >> /rpmbuild/SPECS/turnin.spec
 RUN echo '' >> /rpmbuild/SPECS/turnin.spec
 RUN echo '%files' >> /rpmbuild/SPECS/turnin.spec
