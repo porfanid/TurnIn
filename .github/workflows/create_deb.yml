@@ -22,7 +22,7 @@ jobs:
         run: |
           mkdir -p deb-package/DEBIAN
           echo "Package: turnin" >> deb-package/DEBIAN/control
-          echo "Version: 1.0" >> deb-package/DEBIAN/control
+          echo "Version: 3.0.0" >> deb-package/DEBIAN/control
           echo "Architecture: all" >> deb-package/DEBIAN/control
           echo "Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>" >> deb-package/DEBIAN/control
           echo "Description: TurnIn App" >> deb-package/DEBIAN/control

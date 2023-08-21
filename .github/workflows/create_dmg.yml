@@ -55,11 +55,11 @@ jobs:
           echo '    <key>CFBundlePackageType</key>' >> TurnIn.app/Contents/Info.plist
           echo '    <string>APPL</string>' >> TurnIn.app/Contents/Info.plist
           echo '    <key>CFBundleShortVersionString</key>' >> TurnIn.app/Contents/Info.plist
-          echo '    <string>1.0</string>' >> TurnIn.app/Contents/Info.plist
+          echo '    <string>3.0</string>' >> TurnIn.app/Contents/Info.plist
           echo '    <key>CFBundleSignature</key>' >> TurnIn.app/Contents/Info.plist
           echo '    <string>????</string>' >> TurnIn.app/Contents/Info.plist
           echo '    <key>CFBundleVersion</key>' >> TurnIn.app/Contents/Info.plist
-          echo '    <string>1.0</string>' >> TurnIn.app/Contents/Info.plist
+          echo '    <string>3.0</string>' >> TurnIn.app/Contents/Info.plist
           echo '    <key>CSResourcesFileMapped</key>' >> TurnIn.app/Contents/Info.plist
           echo '    <true/>' >> TurnIn.app/Contents/Info.plist
           echo '    <key>NSAppleScriptEnabled</key>' >> TurnIn.app/Contents/Info.plist
