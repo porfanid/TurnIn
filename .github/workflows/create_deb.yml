@@ -1,4 +1,4 @@
-name: Create Debian Package and Push to Repository
+name: Create Debian Package
 
 on:
   push:
