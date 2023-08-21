@@ -13,50 +13,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install RPM build tools and dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm
-          sudo apt-get install -y python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v1
 
-      - name: Prepare RPM directories
+      - name: Build RPM in Docker
         run: |
-          mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
-
-      - name: Create RPM spec file
-        run: |
-          echo 'Name: turnin' > rpmbuild/SPECS/turnin.spec
-          echo 'Version: 1.0' >> rpmbuild/SPECS/turnin.spec
-          echo 'Release: 1' >> rpmbuild/SPECS/turnin.spec
-          echo 'Summary: TurnIn App' >> rpmbuild/SPECS/turnin.spec
-          echo 'License: MIT' >> rpmbuild/SPECS/turnin.spec
-          echo 'BuildRequires: python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5' >> rpmbuild/SPECS/turnin.spec
-          echo '' >> rpmbuild/SPECS/turnin.spec
-          echo '%description' >> rpmbuild/SPECS/turnin.spec
-          echo 'TurnIn App' >> rpmbuild/SPECS/turnin.spec
-          echo '' >> rpmbuild/SPECS/turnin.spec
-          echo '%prep' >> rpmbuild/SPECS/turnin.spec
-          echo '' >> rpmbuild/SPECS/turnin.spec
-          echo '%install' >> rpmbuild/SPECS/turnin.spec
-          echo 'mkdir -p %{buildroot}/usr/bin' >> rpmbuild/SPECS/turnin.spec
-          echo 'cp turnin.py %{buildroot}/usr/bin/' >> rpmbuild/SPECS/turnin.spec
-          echo 'chmod +x %{buildroot}/usr/bin/turnin.py' >> rpmbuild/SPECS/turnin.spec
-          echo '' >> rpmbuild/SPECS/turnin.spec
-          echo '%files' >> rpmbuild/SPECS/turnin.spec
-          echo '%defattr(-,root,root)' >> rpmbuild/SPECS/turnin.spec
-          echo '/usr/bin/turnin.py' >> rpmbuild/SPECS/turnin.spec
-          echo '/usr/share/icons/cse.logo.png' >> rpmbuild/SPECS/turnin.spec  # Icon file
-
-      - name: Copy source files
-        run: |
-          cp turnin.py rpmbuild/SOURCES/
-          cp cse.logo.png rpmbuild/SOURCES/  # Icon file
-
-      - name: Build RPM package
-        run: rpmbuild -ba rpmbuild/SPECS/turnin.spec
+          docker buildx build --file Dockerfile.rpmbuild --output type=local,dest=. .
 
       - name: Copy RPM artifacts
-        run: cp rpmbuild/RPMS/*/*.rpm .
+        run: cp ./*.rpm .
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v2
