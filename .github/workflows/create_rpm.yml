@@ -13,8 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install RPM build tools
-        run: sudo apt-get update && sudo apt-get install -y rpm
+      - name: Install RPM build tools and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+          sudo apt-get install -y python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
 
       - name: Prepare RPM directories
         run: |
@@ -27,7 +30,7 @@ jobs:
           echo 'Release: 1' >> rpmbuild/SPECS/turnin.spec
           echo 'Summary: TurnIn App' >> rpmbuild/SPECS/turnin.spec
           echo 'License: MIT' >> rpmbuild/SPECS/turnin.spec
-          echo 'BuildRequires: python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5 python3-pyinstaller' >> rpmbuild/SPECS/turnin.spec
+          echo 'BuildRequires: python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5' >> rpmbuild/SPECS/turnin.spec
           echo '' >> rpmbuild/SPECS/turnin.spec
           echo '%description' >> rpmbuild/SPECS/turnin.spec
           echo 'TurnIn App' >> rpmbuild/SPECS/turnin.spec
