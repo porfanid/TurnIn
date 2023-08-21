@@ -1,16 +1,12 @@
-name: Create Packages and Release
+name: Create Debian Package and Push to Repository
 
-#on:
-#  push:
-#    tags:
-#      - '*'
 on:
   push:
       branches:
         - master  # Change this to your default branch name
 
 jobs:
-  build-and-release:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,68 +25,36 @@ jobs:
       - name: Prepare Debian package directory
         run: |
           mkdir -p deb-package/DEBIAN
-          echo "Package: my-python-app" >> deb-package/DEBIAN/control
+          echo "Package: turnin" >> deb-package/DEBIAN/control
           echo "Version: 1.0" >> deb-package/DEBIAN/control
           echo "Architecture: all" >> deb-package/DEBIAN/control
-          echo "Maintainer: Your Name <your.email@example.com>" >> deb-package/DEBIAN/control
-          echo "Description: My Python App" >> deb-package/DEBIAN/control
+          echo "Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>" >> deb-package/DEBIAN/control
+          echo "Description: TurnIn App" >> deb-package/DEBIAN/control
 
           mkdir -p deb-package/usr/bin
           cp turnin.py deb-package/usr/bin
           chmod +x deb-package/usr/bin/turnin.py
 
+          mkdir -p deb-package/usr/share/applications
+          echo "[Desktop Entry]" >> deb-package/usr/share/applications/turnin.desktop
+          echo "Name=TurnIn" >> deb-package/usr/share/applications/turnin.desktop
+          echo "Exec=python3 /usr/bin/turnin.py" >> deb-package/usr/share/applications/turnin.desktop
+          echo "Type=Application" >> deb-package/usr/share/applications/turnin.desktop
+
+      - name: Create post-install script
+        run: |
           echo "#!/bin/bash" > deb-package/DEBIAN/postinst
           echo "pip install -r /usr/bin/turnin.py/requirements.txt" >> deb-package/DEBIAN/postinst
           chmod +x deb-package/DEBIAN/postinst
 
-      - name: Create my-package.spec
+      - name: Build Debian package
         run: |
-          echo "Name: my-package" > my-package.spec
-          echo "Version: 1.0" >> my-package.spec
-          echo "Release: 1%{?dist}" >> my-package.spec
-          echo "Summary: My RPM Package" >> my-package.spec
-          echo "License: MIT" >> my-package.spec
-          echo "URL: https://github.com/your-username/your-repo" >> my-package.spec
-          echo "Source0: %{name}-%{version}.tar.gz" >> my-package.spec
-          echo "" >> my-package.spec
-          echo "%description" >> my-package.spec
-          echo "This is an example RPM package." >> my-package.spec
-          echo "" >> my-package.spec
-          echo "%prep" >> my-package.spec
-          echo "%setup -q -c -n %{name}-%{version}" >> my-package.spec
-          echo "" >> my-package.spec
-          echo "%install" >> my-package.spec
-          echo "rm -rf %{buildroot}" >> my-package.spec
-          echo "mkdir -p %{buildroot}/usr/bin" >> my-package.spec
-          echo "cp turnin.py %{buildroot}/usr/bin/" >> my-package.spec
-          echo "chmod +x %{buildroot}/usr/bin/turnin.py" >> my-package.spec
-          echo "" >> my-package.spec
-          echo "%files" >> my-package.spec
-          echo "%defattr(-,root,root,-)" >> my-package.spec
-          echo "/usr/bin/turnin.py" >> my-package.spec
-          echo "" >> my-package.spec
-          echo "%changelog" >> my-package.spec
-          echo "* Mon Aug 21 2023 Your Name <your.email@example.com> - 1.0-1" >> my-package.spec
-          echo "- Initial package" >> my-package.spec
+          dpkg-deb --build deb-package
 
-      - name: Create source archive
+      - name: Push package to repository
         run: |
-          tar czvf my-package-1.0.tar.gz deb-package
-
-      - name: Prepare RPM build directory
-        run: |
-          mkdir -p ~/rpmbuild/SOURCES
-          cp my-package-1.0.tar.gz ~/rpmbuild/SOURCES/
-
-      - name: Build RPM package
-        run: |
-          rpmbuild -bb my-package.spec
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ./deb-package.deb
-            ~/rpmbuild/RPMS/noarch/my-package-1.0-1.noarch.rpm
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git config --local user.email "pavlos@orfanidis.net.gr"
+          git config --local user.name "Pavlos Orfanidis"
+          git add deb-package.deb
+          git commit -m "Add TurnIn deb package"
+          git push origin HEAD
