@@ -41,15 +41,8 @@ jobs:
 
           mkdir -p deb-package/usr/share/icons
           cp cse.logo.png deb-package/usr/share/icons
-
-      - name: Build Debian package
-        run: |
-          dpkg-deb --build deb-package
-
-      - name: Push package to repository
-        run: |
-          git config --local user.email "pavlos@orfanidis.net.gr"
-          git config --local user.name "Pavlos Orfanidis"
-          git add deb-package.deb
-          git commit -m "Add TurnIn deb package"
-          git push origin HEAD
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: deb-package.deb
+          path: $GITHUB_WORKSPACE/deb-package.deb

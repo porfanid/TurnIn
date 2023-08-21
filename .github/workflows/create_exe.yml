@@ -30,10 +30,8 @@ jobs:
         run: |
           cp dist/turnin.exe ./turnin.exe
 
-      - name: Push EXE file to GitHub release
-        run: |
-          git config --local user.email "your@email.com"
-          git config --local user.name "Your Name"
-          git add turnin.exe
-          git commit -m "Add TurnIn Windows EXE"
-          git push origin HEAD
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: turnin.exe
+          path: $GITHUB_WORKSPACE/turnin.exe
