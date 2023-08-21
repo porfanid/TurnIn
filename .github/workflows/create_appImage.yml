@@ -1,0 +1,56 @@
+name: Create AppImage
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
+
+      - name: Prepare AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp turnin.py AppDir/usr/bin
+          chmod +x AppDir/usr/bin/turnin.py
+
+          mkdir -p AppDir/usr/share/applications
+          echo "[Desktop Entry]" >> AppDir/usr/share/applications/turnin.desktop
+          echo "Name=TurnIn" >> AppDir/usr/share/applications/turnin.desktop
+          echo "Exec=turnin.py" >> AppDir/usr/share/applications/turnin.desktop
+          echo "Icon=turnin" >> AppDir/usr/share/applications/turnin.desktop
+          echo "Type=Application" >> AppDir/usr/share/applications/turnin.desktop
+
+          mkdir -p AppDir/usr/share/icons
+          cp cse.logo.png AppDir/usr/share/icons/turnin.png
+
+      - name: Download and install linuxdeploy
+        run: |
+          wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+
+      - name: Create AppImage
+        run: |
+          linuxdeploy --appdir AppDir --output appimage
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: turnin-appimage.AppImage
+          path: ./out/*.AppImage
