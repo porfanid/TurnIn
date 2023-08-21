@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  build-and-push:
+  build-and-package:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,6 +22,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
+
+      - name: Install FUSE
+        run: |
+          sudo apt-get install -y fuse
 
       - name: Prepare AppDir
         run: |
