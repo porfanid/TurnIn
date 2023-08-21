@@ -1,8 +1,7 @@
-FROM centos:8
+FROM fedora:latest
 
 # Install necessary dependencies
-RUN yum install -y python-pip
-RUN pip install -r requirements.txt
+RUN dnf install -y rpm-build python3-sshtunnel python3-paramiko python3-sentry-sdk python3-pyqt5
 
 # Create RPM build directories
 RUN mkdir -p /rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
