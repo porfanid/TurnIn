@@ -15,7 +15,7 @@ jobs:
 
       - name: Set up Python
         run: |
-          sudo apt install python python-pip
+          sudo apt install python3 python-pip python-is-python3
       
       - name: Install dependencies
         run: |
