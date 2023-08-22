@@ -22,13 +22,13 @@ jobs:
         run: |
           python -m venv venv
           source venv/bin/activate
-
+          pip install -r requirements.txt
+          
           # Replace the venv Python executable with /usr/bin/python
           deactivate  # Deactivate the virtual environment temporarily
           rm -rf venv/bin/python  # Remove the venv Python executable
           ln -s /usr/bin/python venv/bin/python  # Link to the system Python
           source venv/bin/activate  # Reactivate the virtual environment
-          pip install -r requirements.txt
 
       - name: Install FUSE
         run: |
