@@ -46,6 +46,7 @@ jobs:
           # Add the shebang line to AppRun
           echo "#!/bin/bash" >> AppDir/AppRun
           echo 'APPDIR=$(dirname "$(readlink -f "$0")")' >> AppDir/AppRun
+          echo 'source "$APPDIR/venv/bin/activate"' >> AppDir/AppRun
           echo 'PYTHON="$APPDIR/venv/bin/python"' >> AppDir/AppRun
           echo '$PYTHON "$APPDIR/venv/bin/turnin.py"' >> AppDir/AppRun
           chmod +x AppDir/AppRun
