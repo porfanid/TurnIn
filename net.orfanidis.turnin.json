@@ -24,6 +24,9 @@
         ],
         "command": "bash",
         "build-options": {
+            "build-args": {
+                "--share=network"
+            },
             "env": {
             "PYTHONPATH": "$PWD/venv/bin/python3"
             }
