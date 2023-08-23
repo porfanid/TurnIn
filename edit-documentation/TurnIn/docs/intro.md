@@ -14,9 +14,9 @@ Get started by **creating a new file**.
 ### What you'll need
 
 You need to download one of the following files:
-- [TurnIn for Linux](https://github.com/porfanid/TurnIn/releases/download/2.0.0/turnin-client.AppImage)
-- [TurnIn for Windows](https://github.com/porfanid/TurnIn/releases/download/2.0.0/TurninApp.exe)
-- [TurnIn sources](https://github.com/porfanid/TurnIn/archive/refs/heads/master.zip)
+- [TurnIn for Linux](https://github.com/porfanid/TurnIn/releases/download/3.0.0/deb-package.deb)
+- [TurnIn for Windows](https://github.com/porfanid/TurnIn/releases/download/3.0.0/turnin.exe)
+- [TurnIn sources](https://github.com/porfanid/TurnIn/archive/refs/tags/3.0.0.zip)
 
 ## Run the app you downloaded
 
