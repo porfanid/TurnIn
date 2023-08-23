@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkturn_in=self.webpackChunkturn_in||[]).push([[2972],{6057:u=>{u.exports=JSON.parse('{"label":"docusaurus","permalink":"/TurnIn/blog/tags/docusaurus","allTagsPath":"/TurnIn/blog/tags","count":4}')}}]);
