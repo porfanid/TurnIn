@@ -1,0 +1,33 @@
+{
+    "app-id": "net.rfanidis.turnin",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "40",
+    "sdk": "org.gnome.Sdk",
+    "command": "python3",
+    "modules": [
+      {
+        "name": "turnin",
+        "buildsystem": "simple",
+        "build-commands": [
+            "echo 'Creating virtual environment'",
+            "python3 -m venv venv",
+            "source venv/bin/activate",
+            "pip install -r requirements.txt"
+        ],
+        "sources": [
+          {
+            "type": "git",
+            "url": "https://github.com/porfanid/TurnIn.git",
+            "branch": "master"
+          }
+        ],
+        "command": "bash",
+        "build-options": {
+            "env": {
+            "PYTHONPATH": "$PWD/venv/bin/python3"
+            }
+        }
+      }
+    ]
+  }
+  

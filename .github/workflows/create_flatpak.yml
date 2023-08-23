@@ -1,0 +1,34 @@
+name: Build Flatpak Package
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Set up Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y flatpak flatpak-builder
+
+    - name: Build and Install Flatpak Package
+      run: |
+        # Install required SDK and platform runtime (adjust versions as needed)
+        flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak --user install flathub org.gnome.Sdk//40 org.gnome.Platform//40
+
+        # Build and install the Flatpak package
+        flatpak-builder --user --install --force-clean build net.orfanidis.turnin.json
+
+    - name: Upload Package as Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: flatpak-package
+        path: build
