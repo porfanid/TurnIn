@@ -1,7 +1,7 @@
 {
-    "app-id": "net.rfanidis.turnin",
+    "app-id": "net.orfanidis.turnin",
     "runtime": "org.gnome.Platform",
-    "runtime-version": "40",
+    "runtime-version": "44",
     "sdk": "org.gnome.Sdk",
     "command": "python3",
     "modules": [
