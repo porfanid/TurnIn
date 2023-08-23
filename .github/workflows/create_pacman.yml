@@ -10,64 +10,64 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
 
-    - name: Install Dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y python-sshtunnel python-paramiko python-sentry-sdk python-pyqt5 pyinstaller
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python-sshtunnel python-paramiko python-sentry-sdk python-pyqt5 pyinstaller
 
-    - name: Install makepkg
-      run: |
-        sudo apt install -y makepkg
+      - name: Install makepkg
+        run: |
+          sudo apt install -y makepkg
 
-    - name: Build Package
-      run: |
-        pyinstaller --onefile turnin.py
-        cp cse.logo.png dist/
-        echo "[Desktop Entry]" > dist/turnin.desktop
-        echo "Name=Turnin" >> dist/turnin.desktop
-        echo "Exec=/usr/bin/turnin" >> dist/turnin.desktop
-        echo "Icon=cse.logo" >> dist/turnin.desktop
-        echo "Type=Application" >> dist/turnin.desktop
-        echo "Terminal=false" >> dist/turnin.desktop
+      - name: Build Package
+        run: |
+          pyinstaller --onefile turnin.py
+          cp cse.logo.png dist/
+          echo "[Desktop Entry]" > dist/turnin.desktop
+          echo "Name=Turnin" >> dist/turnin.desktop
+          echo "Exec=/usr/bin/turnin" >> dist/turnin.desktop
+          echo "Icon=cse.logo" >> dist/turnin.desktop
+          echo "Type=Application" >> dist/turnin.desktop
+          echo "Terminal=false" >> dist/turnin.desktop
 
-    - name: Prepare Package Directory
-      run: |
-        mkdir -p pkg/turnin/usr/bin
-        mv dist/turnin pkg/turnin/usr/bin
-        mkdir -p pkg/turnin/usr/share/applications
-        mv dist/turnin.desktop pkg/turnin/usr/share/applications
-        mkdir -p pkg/turnin/usr/share/icons
-        mv dist/cse.logo.png pkg/turnin/usr/share/icons/cse.logo.png
+      - name: Prepare Package Directory
+        run: |
+          mkdir -p pkg/turnin/usr/bin
+          mv dist/turnin pkg/turnin/usr/bin
+          mkdir -p pkg/turnin/usr/share/applications
+          mv dist/turnin.desktop pkg/turnin/usr/share/applications
+          mkdir -p pkg/turnin/usr/share/icons
+          mv dist/cse.logo.png pkg/turnin/usr/share/icons/cse.logo.png
 
-    - name: Create PKGBUILD
-      run: |
-        echo "pkgname=turnin" > pkg/turnin/PKGBUILD
-        echo "pkgver=1.0" >> pkg/turnin/PKGBUILD
-        echo "pkgrel=1" >> pkg/turnin/PKGBUILD
-        echo "pkgdesc='Your package description'" >> pkg/turnin/PKGBUILD
-        echo "arch=('any')" >> pkg/turnin/PKGBUILD
-        echo "depends=('python-sshtunnel' 'python-paramiko' 'python-sentry-sdk' 'python-pyqt5')" >> pkg/turnin/PKGBUILD
-        echo "source=('turnin.desktop' 'cse.logo.png')" >> pkg/turnin/PKGBUILD
-        echo "package() {" >> pkg/turnin/PKGBUILD
-        echo "  cd \$srcdir" >> pkg/turnin/PKGBUILD
-        echo "  cp -r turnin \$pkgdir/" >> pkg/turnin/PKGBUILD
-        echo "}" >> pkg/turnin/PKGBUILD
+      - name: Create PKGBUILD
+        run: |
+          echo "pkgname=turnin" > pkg/turnin/PKGBUILD
+          echo "pkgver=1.0" >> pkg/turnin/PKGBUILD
+          echo "pkgrel=1" >> pkg/turnin/PKGBUILD
+          echo "pkgdesc='Your package description'" >> pkg/turnin/PKGBUILD
+          echo "arch=('any')" >> pkg/turnin/PKGBUILD
+          echo "depends=('python-sshtunnel' 'python-paramiko' 'python-sentry-sdk' 'python-pyqt5')" >> pkg/turnin/PKGBUILD
+          echo "source=('turnin.desktop' 'cse.logo.png')" >> pkg/turnin/PKGBUILD
+          echo "package() {" >> pkg/turnin/PKGBUILD
+          echo "  cd \$srcdir" >> pkg/turnin/PKGBUILD
+          echo "  cp -r turnin \$pkgdir/" >> pkg/turnin/PKGBUILD
+          echo "}" >> pkg/turnin/PKGBUILD
 
-    - name: Create Arch Package
-      run: |
-        cd pkg/turnin
-        makepkg -si --noconfirm
+      - name: Create Arch Package
+        run: |
+          cd pkg/turnin
+          makepkg -si --noconfirm
 
-    - name: Upload Package as Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: arch-package
-        path: *.pkg.tar.zst
+      - name: Upload Package as Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: arch-package
+          path: *.pkg.tar.zst
