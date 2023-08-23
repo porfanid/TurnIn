@@ -3,6 +3,7 @@
     "runtime": "org.gnome.Platform",
     "runtime-version": "44",
     "sdk": "org.gnome.Sdk",
+    "sdk-version": "44",
     "command": "python3",
     "modules": [
       {
