@@ -27,6 +27,9 @@
             "env": {
             "PYTHONPATH": "$PWD/venv/bin/python3"
             }
+        },
+        "share": {
+          "network": true
         }
       }
     ]
