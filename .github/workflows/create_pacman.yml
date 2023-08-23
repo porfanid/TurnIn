@@ -3,7 +3,7 @@ name: Create Arch Linux Package
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build:
