@@ -4,6 +4,7 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import HomepageFeatures from '@site/src/components/HomepageFeatures';
+import KofiWidget from '../KofiWidget';
 
 import styles from './index.module.css';
 
@@ -31,10 +32,11 @@ export default function Home() {
   return (
     <Layout
       title={`${siteConfig.title}`}
-      description="Turn in your assignments at the university of Ioannina">
+      description="Turn in your assignments at the University of Ioannina">
       <HomepageHeader />
       <main>
         <HomepageFeatures />
+        <KofiWidget />
       </main>
     </Layout>
   );

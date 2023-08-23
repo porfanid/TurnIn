@@ -17,6 +17,10 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y flatpak flatpak-builder
+    - name: Download python Dependencies
+      run: |
+        mkdir packages
+        pip download -r requirements.txt -d packages
 
     - name: Build and Install Flatpak Package
       run: |

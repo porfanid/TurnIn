@@ -4,16 +4,16 @@
     "runtime-version": "44",
     "sdk": "org.gnome.Sdk",
     "sdk-version": "44",
-    "command": "python3",
+    "command": "$PYTHONPATH turnin.py",
     "modules": [
       {
         "name": "turnin",
         "buildsystem": "simple",
         "build-commands": [
             "echo 'Creating virtual environment'",
-            "python3 -m venv venv",
+            "python -m venv venv",
             "source venv/bin/activate",
-            "pip install -r requirements.txt"
+            "ls -a ./packages | grep whl | sed \"s|^|./packages/|\" | xargs -I {} pip install {}"
         ],
         "sources": [
           {
@@ -24,11 +24,9 @@
         ],
         "command": "bash",
         "build-options": {
-            "build-args": {
-                "--share=network"
-            },
             "env": {
-            "PYTHONPATH": "$PWD/venv/bin/python3"
+            "PYTHONPATH": "$PWD/venv/bin/python",
+            "FLATPAK_WRAPPED_COMMAND": "$PYTHONPATH turnin.py"
             }
         },
         "share": {
