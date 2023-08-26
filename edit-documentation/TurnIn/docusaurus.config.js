@@ -119,7 +119,17 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} <a href="https://pavlos.orfanidis.net.gr">Pavlos Orfanidis</a>`,
+        copyright: `Copyright © ${new Date().getFullYear()} <a href="https://pavlos.orfanidis.net.gr">Pavlos Orfanidis</a>
+        <script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
+<script>
+  kofiWidgetOverlay.draw('porfanid', {
+    'type': 'floating-chat',
+    'floating-chat.donateButton.text': 'Support me',
+    'floating-chat.donateButton.background-color': '#00b9fe',
+    'floating-chat.donateButton.text-color': '#fff'
+  });
+</script>
+        `,
       },
       prism: {
         theme: lightCodeTheme,

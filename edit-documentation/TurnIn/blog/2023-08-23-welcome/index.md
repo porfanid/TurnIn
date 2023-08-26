@@ -23,7 +23,7 @@ In this process I am not alone. I have several friends that have helped me.
 
 ![Ilias Dimopoulos](https://github.com/IliasDimopoulos99.png)
 
-- **[Andreas Tarasidis](https://github.com/AndreasTar)**, who was the first one to create the exe version of the app and heped me debug it
+- **[Andreas Tarasidis](https://github.com/AndreasTar)**, who was the first one to create the exe version of the app and helped me debug it
 
 ![Andreas](https://github.com/AndreasTar.png)
 
