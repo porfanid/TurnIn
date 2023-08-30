@@ -27,3 +27,5 @@ installerTemp/
 
 .venv/
 packages/
+
+creds.bin

@@ -1,10 +1,17 @@
 # importing sentry sdk for error reporting
 import sentry_sdk
 sentry_sdk.init("https://39a7dcc277c54f658ddf7c47deda2a9e@o238115.ingest.sentry.io/5236153")
+
 # ssh tunnel, socket and paramiko for the ssh and sftp commands for the turn in
 import sshtunnel
 import paramiko
-import socket
+
+# tools to encrypt and save the username and password
+import json
+from cryptography.fernet import Fernet
+from cryptography.fernet import InvalidToken
+
+import keyring
 
 # os for the path basename to get the name and other controls
 import os
@@ -109,6 +116,25 @@ def get_host(username, password, host):
 			print("No host to connect to has been found. Aborting...")
 			exit(-1)
 		else:
+			
+			
+			# store the data in an encrypted format
+			data = {
+				'username': username,
+				'password': password
+			}
+			serialized_data = json.dumps(data).encode('utf-8')
+			# Generate or retrieve encryption key
+			key = get_key()
+			cipher_suite = Fernet(key)
+			# Encrypt the serialized data
+			encrypted_data = cipher_suite.encrypt(serialized_data)
+			# Save the encrypted data to a file
+			with open('creds.bin', 'wb') as f:
+				f.write(encrypted_data)
+
+
+
 			return True, host_to_connect, ssh	
 	except paramiko.AuthenticationException:
 		return False, None, None
@@ -143,6 +169,7 @@ def upload_files(files, username, password, ssh, host, temp_dir):
 			msg.setText('No Files were selected! Cannot continue with the turn in.')
 			msg.exec_()
 			app.quit()
+			exit()
 
 def run_command_to_turn_in(host, username, password, host_to_connect, remote_dir, assignment, remote_paths):
 	with sshtunnel.open_tunnel(
@@ -164,12 +191,61 @@ def run_command_to_turn_in(host, username, password, host_to_connect, remote_dir
 			msg.exec_()
 			
 			client.close()
-	
+
+# generate key to encrypt and decrypt the credentials
+def generate_key():
+    key = Fernet.generate_key()
+    keyring.set_password("turnin", "encryption_key", key.decode("utf-8"))
+    return key
+
+# get the key if one has already been generated
+def get_key():
+	key = keyring.get_password("turnin", "encryption_key")
+	if key is None:
+		key = generate_key()
+	return key
 
 if __name__ == '__main__':
-	proxy="scylla.cs.uoi.gr"
 	app = QApplication([])
-	form = LoginForm(proxy,"turnin")
+	proxy="scylla.cs.uoi.gr"
+	temp_dir="turnin"
+
+
+	if os.path.exists("creds.bin"):
+		with open('creds.bin', 'rb') as f:
+			encrypted_data = f.read()
+
+		# Retrieve encryption key
+		key = get_key()
+		cipher_suite = Fernet(key)
+
+		# Decrypt the encrypted data
+		try:
+			decrypted_data = cipher_suite.decrypt(encrypted_data)
+		except InvalidToken as e:
+			msg = QMessageBox()
+			msg.setText("Something went wrong while reading the encrypted password.\nExiting...")
+			msg.exec_()
+			exit()
+
+
+		# Deserialize the decrypted data
+		deserialized_data = json.loads(decrypted_data.decode('utf-8'))
+
+		# Access username and password
+		username = deserialized_data['username']
+		password = deserialized_data['password']
+
+		msg = QMessageBox()
+		msg.setText("Credentials where found on disk. Continuing with the turn in.")
+		msg.exec_()
+
+		turn_in(username, password, proxy, temp_dir)
+		app.quit()
+		exit()
+
+	
+	form = LoginForm(proxy,temp_dir)
 	form.show()
 
 	exit(app.exec_())
