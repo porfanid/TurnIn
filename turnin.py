@@ -64,6 +64,8 @@ class LoginForm(QWidget):
 				if confirm_response == QMessageBox.Yes:
 					break
 				files, _ = QFileDialog.getOpenFileNames(self,"Επιλέξτε τα αρχεία που θέλετε να παραδώσετε:", "","All Files (*)", options=options)
+			else:
+				break
 		return files
 
 	def check_password(self):
