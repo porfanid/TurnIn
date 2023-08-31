@@ -67,6 +67,31 @@ class LoginForm(QWidget):
 		turn_in(username, password, self.host, self.temp_dir)
 		
 		#def upload_files(files, username, password, ssh, host, temp_dir):
+		# tries to connect to ssh server and if not, shows the wr
+		try:
+			ssh = paramiko.SSHClient()
+			
+			ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())		
+			
+			ssh.connect(proxy, username=username, password=password)
+			_, ssh_stdout, ssh_stderr = ssh.exec_command("rupt")
+			servers=ssh_stdout.readlines()
+			_, ssh_stdout, ssh_stderr = ssh.exec_command("pwd")
+			home_dir=ssh_stdout.readlines()[0][:-1]
+			host_to_connect = None
+			
+			for server in servers:
+				server=server.split()
+				host_name=server[0]
+				host_is_up=(server[1]=="up")
+				if host_is_up and ("dl" in host_name):
+					host_to_connect=host_name
+					print(f"{host_name} -> is up: {host_is_up}")
+					break
+				
+			if not host_to_connect:
+				print("No host to connect to has been found. Aborting...")
+				exit(-1)
 
 
 #################################################################################
@@ -129,55 +154,58 @@ def get_host(username, password, host):
 		else:
 			
 			
-			# store the data in an encrypted format
-			data = {
-				'username': username,
-				'password': password
-			}
-			serialized_data = json.dumps(data).encode('utf-8')
-			# Generate or retrieve encryption key
-			key = get_key()
-			cipher_suite = Fernet(key)
-			# Encrypt the serialized data
-			encrypted_data = cipher_suite.encrypt(serialized_data)
-			# Save the encrypted data to a file
-			with open('creds.bin', 'wb') as f:
-				f.write(encrypted_data)
-
-
-
-			return True, host_to_connect, ssh	
-	except paramiko.AuthenticationException:
-		return False, None, None
-
-
-def upload_files(files, username, password, ssh, host, temp_dir):
-	_, ssh_stdout, ssh_stderr = ssh.exec_command("pwd")
-	home_dir=ssh_stdout.readlines()[0][:-1]
-	transport = paramiko.Transport((host,22))
-	transport.connect(None,username,password)
-	sftp = paramiko.SFTPClient.from_transport(transport)
-	if files:
-		remote_dir=f"{home_dir}/{temp_dir}/"
-		print(remote_dir)
-		try:
-			sftp.mkdir(remote_dir)
-		except:
-			print("Could not create directory.")
-		remote_paths=[]
-		for localpath in files:
-			name=os.path.basename(localpath)
-			filepath = "{}{}".format(remote_dir,name)
-			try:
-				sftp.put(localpath,filepath)
-				remote_paths.append(name)
-				print("Localpath was successfully uploaded to server.")
-			except Exception as e:
-				print("Could not upload file: "+str(e))
-		return remote_dir, remote_paths
-	else:
-			msg = QMessageBox()
-			msg.setText('No Files were selected! Cannot continue with the turn in.')
+			transport = paramiko.Transport((self.host,22))
+			transport.connect(None,username,password)
+			sftp = paramiko.SFTPClient.from_transport(transport)
+			if files:
+				remote_dir=f"{home_dir}/{self.temp_dir}/"
+				print(remote_dir)
+				try:
+					sftp.mkdir(remote_dir)
+				except:
+					print("Could not create directory.")
+				remote_paths=[]
+				for localpath in files:
+					name=os.path.basename(localpath)
+					filepath = "{}{}".format(remote_dir,name)
+					try:
+						sftp.put(localpath,filepath)
+						remote_paths.append(name)
+						print("Localpath was successfully uploaded to server.")
+					except Exception as e:
+						print("Could not upload file: "+str(e))
+				text, okPressed = QInputDialog.getText(self, "Άσκηση:","Ο κωδικός της άσκησης:", QLineEdit.Normal, "")
+				if okPressed and text != '':
+					turn_in_command = f"cd {remote_dir}&&yes|turnin {text} {' '.join(remote_paths)}"
+					print(turn_in_command)
+					
+					with sshtunnel.open_tunnel(
+						(self.host, 22),
+						ssh_username=username,
+						ssh_password=password,
+						remote_bind_address=(host_to_connect, 22),
+						local_bind_address=('0.0.0.0', 10022)
+					) as _:
+						client = paramiko.SSHClient()
+						client.load_system_host_keys()
+						
+						
+						client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+						
+						
+						client.connect('127.0.0.1', 10022, username=username, password=password)
+						_, ssh_stdout, ssh_stderr = client.exec_command(turn_in_command)
+						client.exec_command(f"rm -R {remote_dir}")
+						msg.setText(f"{''.join(ssh_stdout.readlines())}\n\n{''.join(ssh_stderr.readlines())}")
+						msg.exec_()
+						
+						client.close()
+			else:
+				msg.setText('No Files were selected! Cannot continue with the turn in.')
+				msg.exec_()
+				app.quit()
+		except paramiko.AuthenticationException:
+			msg.setText('Wrong Password! Please try again.')
 			msg.exec_()
 			app.quit()
 			exit()
@@ -273,3 +301,11 @@ if __name__ == '__main__':
 	form = LoginForm(proxy,temp_dir)
 	form.show()
 	exit(app.exec_())
+
+
+
+
+'''
+scylla.cs.uoi.gr ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC4FBvewUk/bWUNOZ4ZQEQ76+Rlodr/ZPDCTPcWhHL+Z4z3plDo/BMoEs21vtsFviI4XDOntQXzUlgG8Ro0xk8tNmXztG9C5AHhl0g6axyvFyRy6hFDx1K+LFWaF7KdtdfOtAUdeP4DRPr+wX9dL6M0j/D5OVGaY3SQD+YJMed8IjmWgqOxMTjSerluTET/L0+VBo82ng2Y/dYxLLFAtimkbzfK0tgEd61cayo4Aymt3XHSBmDQm7g9nnrFMLIyYEFsMoBy7vrOOFSYvP0ejIeLOzHxlUKs9SzKDXiISDfXfLPGzoNjw7t3UpgnAv+Zb+gk4O+iMVAgCGubBuFu6iq3
+scylla.cs.uoi.gr ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHRcr33y6VL9eRyZRetzPWKHW2Djp6loH+/Kw0bckdR7lkiLGFlfcZ8jXhlvf9ieglZkqgH0xTOE6Pwq4F1CweA=
+'''
