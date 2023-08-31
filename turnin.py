@@ -264,10 +264,6 @@ if __name__ == '__main__':
 			username = deserialized_data['username']
 			password = deserialized_data['password']
 
-			msg = QMessageBox()
-			msg.setText("Credentials where found on disk. Continuing with the turn in.")
-			msg.exec_()
-
 			turn_in(username, password, proxy, temp_dir)
 			app.quit()
 			exit()
