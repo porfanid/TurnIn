@@ -21,6 +21,13 @@ from PyQt5 import QtGui, QtCore
 # system, for the exit function and to get wether the platform is windows or linux
 from sys import platform, exit
 
+
+
+
+
+#################################################################################
+# Function to implement the login method for the gui
+#################################################################################
 class LoginForm(QWidget):
 # Creates the login form and adds the function to call when the login button is pressed
 	def __init__(self,host,temp_dir):
@@ -61,6 +68,10 @@ class LoginForm(QWidget):
 		
 		#def upload_files(files, username, password, ssh, host, temp_dir):
 
+
+#################################################################################
+# Functions to implement the functionality of the turnin application
+#################################################################################
 
 def turn_in(username, password, host, temp_dir):
 	result, host_to_connect, ssh = get_host(username, password, host)
@@ -192,6 +203,9 @@ def run_command_to_turn_in(host, username, password, host_to_connect, remote_dir
 			
 			client.close()
 
+#################################################################################
+# Functions for the encryption and Decryption of the credentials
+#################################################################################
 # generate key to encrypt and decrypt the credentials
 def generate_key():
     key = Fernet.generate_key()
@@ -205,6 +219,11 @@ def get_key():
 		key = generate_key()
 	return key
 
+
+
+########################################################
+# Main Application starting
+########################################################
 if __name__ == '__main__':
 	app = QApplication([])
 	proxy="scylla.cs.uoi.gr"
@@ -212,40 +231,49 @@ if __name__ == '__main__':
 
 
 	if os.path.exists("creds.bin"):
-		with open('creds.bin', 'rb') as f:
-			encrypted_data = f.read()
 
-		# Retrieve encryption key
-		key = get_key()
-		cipher_suite = Fernet(key)
+		confirm_msg = QMessageBox()
+		confirm_msg.setIcon(QMessageBox.Question)
+		confirm_msg.setText("Do you want to use the account saved in the creds.bin file?")
 
-		# Decrypt the encrypted data
-		try:
-			decrypted_data = cipher_suite.decrypt(encrypted_data)
-		except InvalidToken as e:
+		confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+		confirm_response = confirm_msg.exec_()
+
+		if confirm_response == QMessageBox.Yes:
+			with open('creds.bin', 'rb') as f:
+				encrypted_data = f.read()
+
+			# Retrieve encryption key
+			key = get_key()
+			cipher_suite = Fernet(key)
+
+			# Decrypt the encrypted data
+			try:
+				decrypted_data = cipher_suite.decrypt(encrypted_data)
+			except InvalidToken as e:
+				msg = QMessageBox()
+				msg.setText("Something went wrong while reading the encrypted password.\nExiting...")
+				msg.exec_()
+				exit()
+
+
+			# Deserialize the decrypted data
+			deserialized_data = json.loads(decrypted_data.decode('utf-8'))
+
+			# Access username and password
+			username = deserialized_data['username']
+			password = deserialized_data['password']
+
 			msg = QMessageBox()
-			msg.setText("Something went wrong while reading the encrypted password.\nExiting...")
+			msg.setText("Credentials where found on disk. Continuing with the turn in.")
 			msg.exec_()
+
+			turn_in(username, password, proxy, temp_dir)
+			app.quit()
 			exit()
-
-
-		# Deserialize the decrypted data
-		deserialized_data = json.loads(decrypted_data.decode('utf-8'))
-
-		# Access username and password
-		username = deserialized_data['username']
-		password = deserialized_data['password']
-
-		msg = QMessageBox()
-		msg.setText("Credentials where found on disk. Continuing with the turn in.")
-		msg.exec_()
-
-		turn_in(username, password, proxy, temp_dir)
-		app.quit()
-		exit()
+		
 
 	
 	form = LoginForm(proxy,temp_dir)
 	form.show()
-
 	exit(app.exec_())
