@@ -12,6 +12,7 @@ from cryptography.fernet import Fernet
 from cryptography.fernet import InvalidToken
 
 import keyring
+import base64
 
 # os for the path basename to get the name and other controls
 import os
@@ -23,6 +24,30 @@ from sys import platform, exit
 
 
 
+
+
+
+# Define the host keys
+ssh_keys = [
+    ("scylla.cs.uoi.gr", "ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABAQC4FBvewUk/bWUNOZ4ZQEQ76+Rlodr/ZPDCTPcWhHL+Z4z3plDo/BMoEs21vtsFviI4XDOntQXzUlgG8Ro0xk8tNmXztG9C5AHhl0g6axyvFyRy6hFDx1K+LFWaF7KdtdfOtAUdeP4DRPr+wX9dL6M0j/D5OVGaY3SQD+YJMed8IjmWgqOxMTjSerluTET/L0+VBo82ng2Y/dYxLLFAtimkbzfK0tgEd61cayo4Aymt3XHSBmDQm7g9nnrFMLIyYEFsMoBy7vrOOFSYvP0ejIeLOzHxlUKs9SzKDXiISDfXfLPGzoNjw7t3UpgnAv+Zb+gk4O+iMVAgCGubBuFu6iq3"),
+    ("scylla.cs.uoi.gr", "ecdsa-sha2-nistp256", "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHRcr33y6VL9eRyZRetzPWKHW2Djp6loH+/Kw0bckdR7lkiLGFlfcZ8jXhlvf9ieglZkqgH0xTOE6Pwq4F1CweA="),
+    ("dl380ws01", "ecdsa-sha2-nistp256", "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMli3FZmz2PlHCGinbPc7yYHGdjj037UPzoBuNlKwOyDO5JfHE3G81PheGIiuqcaZSYqxnTysa/X0fnNAuZRejI="),
+    ("dl380ws01", "ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAILq44YUHEbz9LGd2Fbuaaxkh1rIjxyF0ElStXODKhGfE"),
+    ("dl380ws01", "ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABgQCimHCSTUTVOdr6/Egw8O9Y7/q6jmFYDMDm8gPbfecaQB+Gtp+2+FmLv30D5rA5uEhqgND8xuM1FI1zpXhu/MChdA3SA/GMwPSGRz8B45gLQCjdd7O9Jn+rVetSKxNOXJaKMKmoQLKWCTbyTi5VRsG6HPWtiWcVcmlfBt8nrx/RW4ZDidr6kGTjjxpBYdjsUuyCtVG85OIwD9GdYSwKWPInUYWl6adh/9V4nrwuGfjgr47+9PR5Qi35DyNP1lzLqSbyiGMRBSUueuVIb6ZGNgxRnxjiO7dBToh8GaYLN/3MHTqptV8F/zNZ+yqakAIM9efVMdx3tp/CNYFRd/lMc7GGzD28N+1RqRwlvwqQlXG3H5Ay9+1kOFBa+rhFt8iUG1AMv5VyQPTa2rlIGW3sdL8pnkl4wf9D1VitC4CFl0s7OYPinfM0R3bBHq0LvPQaSqJRH2vXv3aA5akcEANQKs8W+Bq5a698+ghMF83wd/cU4Ghe+5higrsDMZsAAZMb3ic="),
+    ("dl380ws02", "ecdsa-sha2-nistp256", "AAAAB3NzaC1yc2EAAAADAQABAAABgQCimHCSTUTVOdr6/Egw8O9Y7/q6jmFYDMDm8gPbfecaQB+Gtp+2+FmLv30D5rA5uEhqgND8xuM1FI1zpXhu/MChdA3SA/GMwPSGRz8B45gLQCjdd7O9Jn+rVetSKxNOXJaKMKmoQLKWCTbyTi5VRsG6HPWtiWcVcmlfBt8nrx/RW4ZDidr6kGTjjxpBYdjsUuyCtVG85OIwD9GdYSwKWPInUYWl6adh/9V4nrwuGfjgr47+9PR5Qi35DyNP1lzLqSbyiGMRBSUueuVIb6ZGNgxRnxjiO7dBToh8GaYLN/3MHTqptV8F/zNZ+yqakAIM9efVMdx3tp/CNYFRd/lMc7GGzD28N+1RqRwlvwqQlXG3H5Ay9+1kOFBa+rhFt8iUG1AMv5VyQPTa2rlIGW3sdL8pnkl4wf9D1VitC4CFl0s7OYPinfM0R3bBHq0LvPQaSqJRH2vXv3aA5akcEANQKs8W+Bq5a698+ghMF83wd/cU4Ghe+5higrsDMZsAAZMb3ic="),
+    ("dl380ws03", "ecdsa-sha2-nistp256", "AAAAB3NzaC1yc2EAAAADAQABAAABgQCimHCSTUTVOdr6/Egw8O9Y7/q6jmFYDMDm8gPbfecaQB+Gtp+2+FmLv30D5rA5uEhqgND8xuM1FI1zpXhu/MChdA3SA/GMwPSGRz8B45gLQCjdd7O9Jn+rVetSKxNOXJaKMKmoQLKWCTbyTi5VRsG6HPWtiWcVcmlfBt8nrx/RW4ZDidr6kGTjjxpBYdjsUuyCtVG85OIwD9GdYSwKWPInUYWl6adh/9V4nrwuGfjgr47+9PR5Qi35DyNP1lzLqSbyiGMRBSUueuVIb6ZGNgxRnxjiO7dBToh8GaYLN/3MHTqptV8F/zNZ+yqakAIM9efVMdx3tp/CNYFRd/lMc7GGzD28N+1RqRwlvwqQlXG3H5Ay9+1kOFBa+rhFt8iUG1AMv5VyQPTa2rlIGW3sdL8pnkl4wf9D1VitC4CFl0s7OYPinfM0R3bBHq0LvPQaSqJRH2vXv3aA5akcEANQKs8W+Bq5a698+ghMF83wd/cU4Ghe+5higrsDMZsAAZMb3ic="),
+    ("dl380ws03", "ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAILq44YUHEbz9LGd2Fbuaaxkh1rIjxyF0ElStXODKhGfE"),
+    ("dl380ws03", "ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABgQCimHCSTUTVOdr6/Egw8O9Y7/q6jmFYDMDm8gPbfecaQB+Gtp+2+FmLv30D5rA5uEhqgND8xuM1FI1zpXhu/MChdA3SA/GMwPSGRz8B45gLQCjdd7O9Jn+rVetSKxNOXJaKMKmoQLKWCTbyTi5VRsG6HPWtiWcVcmlfBt8nrx/RW4ZDidr6kGTjjxpBYdjsUuyCtVG85OIwD9GdYSwKWPInUYWl6adh/9V4nrwuGfjgr47+9PR5Qi35DyNP1lzLqSbyiGMRBSUueuVIb6ZGNgxRnxjiO7dBToh8GaYLN/3MHTqptV8F/zNZ+yqakAIM9efVMdx3tp/CNYFRd/lMc7GGzD28N+1RqRwlvwqQlXG3H5Ay9+1kOFBa+rhFt8iUG1AMv5VyQPTa2rlIGW3sdL8pnkl4wf9D1VitC4CFl0s7OYPinfM0R3bBHq0LvPQaSqJRH2vXv3aA5akcEANQKs8W+Bq5a698+ghMF83wd/cU4Ghe+5higrsDMZsAAZMb3ic="),
+    ("dl380ws04", "ecdsa-sha2-nistp256", "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMli3FZmz2PlHCGinbPc7yYHGdjj037UPzoBuNlKwOyDO5JfHE3G81PheGIiuqcaZSYqxnTysa/X0fnNAuZRejI="),
+    ("dl380ws04", "ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAILq44YUHEbz9LGd2Fbuaaxkh1rIjxyF0ElStXODKhGfE"),
+    ("dl380ws04", "ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABgQCimHCSTUTVOdr6/Egw8O9Y7/q6jmFYDMDm8gPbfecaQB+Gtp+2+FmLv30D5rA5uEhqgND8xuM1FI1zpXhu/MChdA3SA/GMwPSGRz8B45gLQCjdd7O9Jn+rVetSKxNOXJaKMKmoQLKWCTbyTi5VRsG6HPWtiWcVcmlfBt8nrx/RW4ZDidr6kGTjjxpBYdjsUuyCtVG85OIwD9GdYSwKWPInUYWl6adh/9V4nrwuGfjgr47+9PR5Qi35DyNP1lzLqSbyiGMRBSUueuVIb6ZGNgxRnxjiO7dBToh8GaYLN/3MHTqptV8F/zNZ+yqakAIM9efVMdx3tp/CNYFRd/lMc7GGzD28N+1RqRwlvwqQlXG3H5Ay9+1kOFBa+rhFt8iUG1AMv5VyQPTa2rlIGW3sdL8pnkl4wf9D1VitC4CFl0s7OYPinfM0R3bBHq0LvPQaSqJRH2vXv3aA5akcEANQKs8W+Bq5a698+ghMF83wd/cU4Ghe+5higrsDMZsAAZMb3ic="),
+    ("dl380ws05", "ecdsa-sha2-nistp256", "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMli3FZmz2PlHCGinbPc7yYHGdjj037UPzoBuNlKwOyDO5JfHE3G81PheGIiuqcaZSYqxnTysa/X0fnNAuZRejI="),
+    ("dl380ws05", "ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAILq44YUHEbz9LGd2Fbuaaxkh1rIjxyF0ElStXODKhGfE"),
+    ("dl380ws05", "ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABgQCimHCSTUTVOdr6/Egw8O9Y7/q6jmFYDMDm8gPbfecaQB+Gtp+2+FmLv30D5rA5uEhqgND8xuM1FI1zpXhu/MChdA3SA/GMwPSGRz8B45gLQCjdd7O9Jn+rVetSKxNOXJaKMKmoQLKWCTbyTi5VRsG6HPWtiWcVcmlfBt8nrx/RW4ZDidr6kGTjjxpBYdjsUuyCtVG85OIwD9GdYSwKWPInUYWl6adh/9V4nrwuGfjgr47+9PR5Qi35DyNP1lzLqSbyiGMRBSUueuVIb6ZGNgxRnxjiO7dBToh8GaYLN/3MHTqptV8F/zNZ+yqakAIM9efVMdx3tp/CNYFRd/lMc7GGzD28N+1RqRwlvwqQlXG3H5Ay9+1kOFBa+rhFt8iUG1AMv5VyQPTa2rlIGW3sdL8pnkl4wf9D1VitC4CFl0s7OYPinfM0R3bBHq0LvPQaSqJRH2vXv3aA5akcEANQKs8W+Bq5a698+ghMF83wd/cU4Ghe+5higrsDMZsAAZMb3ic="),
+    ("dl380ws06", "ecdsa-sha2-nistp256", "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMli3FZmz2PlHCGinbPc7yYHGdjj037UPzoBuNlKwOyDO5JfHE3G81PheGIiuqcaZSYqxnTysa/X0fnNAuZRejI="),
+    ("dl380ws06", "ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAILq44YUHEbz9LGd2Fbuaaxkh1rIjxyF0ElStXODKhGfE"),
+    ("dl380ws06", "ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABgQCimHCSTUTVOdr6/Egw8O9Y7/q6jmFYDMDm8gPbfecaQB+Gtp+2+FmLv30D5rA5uEhqgND8xuM1FI1zpXhu/MChdA3SA/GMwPSGRz8B45gLQCjdd7O9Jn+rVetSKxNOXJaKMKmoQLKWCTbyTi5VRsG6HPWtiWcVcmlfBt8nrx/RW4ZDidr6kGTjjxpBYdjsUuyCtVG85OIwD9GdYSwKWPInUYWl6adh/9V4nrwuGfjgr47+9PR5Qi35DyNP1lzLqSbyiGMRBSUueuVIb6ZGNgxRnxjiO7dBToh8GaYLN/3MHTqptV8F/zNZ+yqakAIM9efVMdx3tp/CNYFRd/lMc7GGzD28N+1RqRwlvwqQlXG3H5Ay9+1kOFBa+rhFt8iUG1AMv5VyQPTa2rlIGW3sdL8pnkl4wf9D1VitC4CFl0s7OYPinfM0R3bBHq0LvPQaSqJRH2vXv3aA5akcEANQKs8W+Bq5a698+ghMF83wd/cU4Ghe+5higrsDMZsAAZMb3ic=")
+]
 
 
 #################################################################################
@@ -67,31 +92,6 @@ class LoginForm(QWidget):
 		turn_in(username, password, self.host, self.temp_dir)
 		
 		#def upload_files(files, username, password, ssh, host, temp_dir):
-		# tries to connect to ssh server and if not, shows the wr
-		try:
-			ssh = paramiko.SSHClient()
-			
-			ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())		
-			
-			ssh.connect(proxy, username=username, password=password)
-			_, ssh_stdout, ssh_stderr = ssh.exec_command("rupt")
-			servers=ssh_stdout.readlines()
-			_, ssh_stdout, ssh_stderr = ssh.exec_command("pwd")
-			home_dir=ssh_stdout.readlines()[0][:-1]
-			host_to_connect = None
-			
-			for server in servers:
-				server=server.split()
-				host_name=server[0]
-				host_is_up=(server[1]=="up")
-				if host_is_up and ("dl" in host_name):
-					host_to_connect=host_name
-					print(f"{host_name} -> is up: {host_is_up}")
-					break
-				
-			if not host_to_connect:
-				print("No host to connect to has been found. Aborting...")
-				exit(-1)
 
 
 #################################################################################
@@ -107,9 +107,16 @@ def turn_in(username, password, host, temp_dir):
 		return -1
 	files=getFiles()
 	remote_dir, remote_paths = upload_files(files, username, password, ssh, host, temp_dir)
+	ssh.close()
 	assignment, okPressed = QInputDialog.getText(None, "Άσκηση:","Ο κωδικός της άσκησης:", QLineEdit.Normal, "")
 	if okPressed and assignment != '':
 		run_command_to_turn_in(host, username, password, host_to_connect, remote_dir, assignment, remote_paths)
+
+def add_ssh_keys(ssh):
+	for hostname, key_type, key_data in ssh_keys:
+		#for hostname, _, public_key_data in ssh_keys:
+		ssh.get_host_keys().add(hostname, 'ssh-rsa', paramiko.RSAKey(data=key_data))
+
 
 def getFiles():
 	options = QFileDialog.Options()
@@ -135,7 +142,8 @@ def getFiles():
 def get_host(username, password, host):
 	try:
 		ssh = paramiko.SSHClient()
-		ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())		
+		#add_ssh_keys(ssh)
+		ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
 		ssh.connect(proxy, username=username, password=password)
 		_, ssh_stdout, ssh_stderr = ssh.exec_command("rupt")
 		servers=ssh_stdout.readlines()
@@ -154,58 +162,55 @@ def get_host(username, password, host):
 		else:
 			
 			
-			transport = paramiko.Transport((self.host,22))
-			transport.connect(None,username,password)
-			sftp = paramiko.SFTPClient.from_transport(transport)
-			if files:
-				remote_dir=f"{home_dir}/{self.temp_dir}/"
-				print(remote_dir)
-				try:
-					sftp.mkdir(remote_dir)
-				except:
-					print("Could not create directory.")
-				remote_paths=[]
-				for localpath in files:
-					name=os.path.basename(localpath)
-					filepath = "{}{}".format(remote_dir,name)
-					try:
-						sftp.put(localpath,filepath)
-						remote_paths.append(name)
-						print("Localpath was successfully uploaded to server.")
-					except Exception as e:
-						print("Could not upload file: "+str(e))
-				text, okPressed = QInputDialog.getText(self, "Άσκηση:","Ο κωδικός της άσκησης:", QLineEdit.Normal, "")
-				if okPressed and text != '':
-					turn_in_command = f"cd {remote_dir}&&yes|turnin {text} {' '.join(remote_paths)}"
-					print(turn_in_command)
-					
-					with sshtunnel.open_tunnel(
-						(self.host, 22),
-						ssh_username=username,
-						ssh_password=password,
-						remote_bind_address=(host_to_connect, 22),
-						local_bind_address=('0.0.0.0', 10022)
-					) as _:
-						client = paramiko.SSHClient()
-						client.load_system_host_keys()
-						
-						
-						client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-						
-						
-						client.connect('127.0.0.1', 10022, username=username, password=password)
-						_, ssh_stdout, ssh_stderr = client.exec_command(turn_in_command)
-						client.exec_command(f"rm -R {remote_dir}")
-						msg.setText(f"{''.join(ssh_stdout.readlines())}\n\n{''.join(ssh_stderr.readlines())}")
-						msg.exec_()
-						
-						client.close()
-			else:
-				msg.setText('No Files were selected! Cannot continue with the turn in.')
-				msg.exec_()
-				app.quit()
-		except paramiko.AuthenticationException:
-			msg.setText('Wrong Password! Please try again.')
+			# store the data in an encrypted format
+			data = {
+				'username': username,
+				'password': password
+			}
+			serialized_data = json.dumps(data).encode('utf-8')
+			# Generate or retrieve encryption key
+			key = get_key()
+			cipher_suite = Fernet(key)
+			# Encrypt the serialized data
+			encrypted_data = cipher_suite.encrypt(serialized_data)
+			# Save the encrypted data to a file
+			with open('creds.bin', 'wb') as f:
+				f.write(encrypted_data)
+
+
+
+			return True, host_to_connect, ssh	
+	except paramiko.AuthenticationException:
+		return False, None, None
+
+
+def upload_files(files, username, password, ssh, host, temp_dir):
+	_, ssh_stdout, ssh_stderr = ssh.exec_command("pwd")
+	home_dir=ssh_stdout.readlines()[0][:-1]
+	transport = paramiko.Transport((host,22))
+	transport.connect(None,username,password)
+	sftp = paramiko.SFTPClient.from_transport(transport)
+	if files:
+		remote_dir=f"{home_dir}/{temp_dir}/"
+		print(remote_dir)
+		try:
+			sftp.mkdir(remote_dir)
+		except:
+			print("Could not create directory.")
+		remote_paths=[]
+		for localpath in files:
+			name=os.path.basename(localpath)
+			filepath = "{}{}".format(remote_dir,name)
+			try:
+				sftp.put(localpath,filepath)
+				remote_paths.append(name)
+				print("Localpath was successfully uploaded to server.")
+			except Exception as e:
+				print("Could not upload file: "+str(e))
+		return remote_dir, remote_paths
+	else:
+			msg = QMessageBox()
+			msg.setText('No Files were selected! Cannot continue with the turn in.')
 			msg.exec_()
 			app.quit()
 			exit()
@@ -218,18 +223,20 @@ def run_command_to_turn_in(host, username, password, host_to_connect, remote_dir
 			remote_bind_address=(host_to_connect, 22),
 			local_bind_address=('0.0.0.0', 10022)
 		) as _:
-			client = paramiko.SSHClient()
-			client.load_system_host_keys()
-			client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-			client.connect('127.0.0.1', 10022, username=username, password=password)
+			ssh = paramiko.SSHClient()
+			ssh.load_system_host_keys()
+			# add_ssh_keys(ssh)
+			ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
+
+			ssh.connect('127.0.0.1', 10022, username=username, password=password)
 			turn_in_command = f"cd {remote_dir}&&yes|turnin {assignment} {' '.join(remote_paths)}"
-			_, ssh_stdout, ssh_stderr = client.exec_command(turn_in_command)
-			client.exec_command(f"rm -R {remote_dir}")
+			_, ssh_stdout, ssh_stderr = ssh.exec_command(turn_in_command)
+			ssh.exec_command(f"rm -R {remote_dir}")
 			msg = QMessageBox()
 			msg.setText(f"{''.join(ssh_stdout.readlines())}\n\n{''.join(ssh_stderr.readlines())}")
 			msg.exec_()
 			
-			client.close()
+			ssh.close()
 
 #################################################################################
 # Functions for the encryption and Decryption of the credentials
@@ -301,11 +308,3 @@ if __name__ == '__main__':
 	form = LoginForm(proxy,temp_dir)
 	form.show()
 	exit(app.exec_())
-
-
-
-
-'''
-scylla.cs.uoi.gr ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC4FBvewUk/bWUNOZ4ZQEQ76+Rlodr/ZPDCTPcWhHL+Z4z3plDo/BMoEs21vtsFviI4XDOntQXzUlgG8Ro0xk8tNmXztG9C5AHhl0g6axyvFyRy6hFDx1K+LFWaF7KdtdfOtAUdeP4DRPr+wX9dL6M0j/D5OVGaY3SQD+YJMed8IjmWgqOxMTjSerluTET/L0+VBo82ng2Y/dYxLLFAtimkbzfK0tgEd61cayo4Aymt3XHSBmDQm7g9nnrFMLIyYEFsMoBy7vrOOFSYvP0ejIeLOzHxlUKs9SzKDXiISDfXfLPGzoNjw7t3UpgnAv+Zb+gk4O+iMVAgCGubBuFu6iq3
-scylla.cs.uoi.gr ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHRcr33y6VL9eRyZRetzPWKHW2Djp6loH+/Kw0bckdR7lkiLGFlfcZ8jXhlvf9ieglZkqgH0xTOE6Pwq4F1CweA=
-'''
