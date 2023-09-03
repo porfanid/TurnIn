@@ -89,7 +89,7 @@ class LoginForm(QWidget):
 	def send(self):
 		username = self.lineEdit_username.text()
 		password = self.lineEdit_password.text()
-		turn_in(username, password, self.host, self.temp_dir)
+		turn_in(username, password, self.host, self.temp_dir, True)
 		
 		#def upload_files(files, username, password, ssh, host, temp_dir):
 
@@ -98,8 +98,8 @@ class LoginForm(QWidget):
 # Functions to implement the functionality of the turnin application
 #################################################################################
 
-def turn_in(username, password, host, temp_dir):
-	result, host_to_connect, ssh = get_host(username, password, host)
+def turn_in(username, password, host, temp_dir, ask_to_save=False):
+	result, host_to_connect, ssh = get_host(username, password, host, ask_to_save)
 	if not result:
 		msg=QMessageBox()
 		msg.setText('Wrong Password! Please try again.')
@@ -148,7 +148,7 @@ def getFiles():
 			break
 	return files
 
-def get_host(username, password, host):
+def get_host(username, password, host, ask_to_save=False):
 	try:
 		ssh = paramiko.SSHClient()
 		add_ssh_keys(ssh)
@@ -177,29 +177,30 @@ def get_host(username, password, host):
 			print("No host to connect to has been found. Aborting...")
 			exit(-1)
 		else:
-			
-			confirm_msg = QMessageBox()
-			confirm_msg.setIcon(QMessageBox.Question)
-			confirm_msg.setText("Do you want to save your credentials?")
 
-			confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-			confirm_response = confirm_msg.exec_()
+			if ask_to_save:
+				confirm_msg = QMessageBox()
+				confirm_msg.setIcon(QMessageBox.Question)
+				confirm_msg.setText("Do you want to save your credentials?")
 
-			if confirm_response == QMessageBox.Yes:
-				# store the data in an encrypted format
-				data = {
-					'username': username,
-					'password': password
-				}
-				serialized_data = json.dumps(data).encode('utf-8')
-				# Generate or retrieve encryption key
-				key = get_key()
-				cipher_suite = Fernet(key)
-				# Encrypt the serialized data
-				encrypted_data = cipher_suite.encrypt(serialized_data)
-				# Save the encrypted data to a file
-				with open('creds.bin', 'wb') as f:
-					f.write(encrypted_data)
+				confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+				confirm_response = confirm_msg.exec_()
+
+				if confirm_response == QMessageBox.Yes:
+					# store the data in an encrypted format
+					data = {
+						'username': username,
+						'password': password
+					}
+					serialized_data = json.dumps(data).encode('utf-8')
+					# Generate or retrieve encryption key
+					key = get_key()
+					cipher_suite = Fernet(key)
+					# Encrypt the serialized data
+					encrypted_data = cipher_suite.encrypt(serialized_data)
+					# Save the encrypted data to a file
+					with open('creds.bin', 'wb') as f:
+						f.write(encrypted_data)
 			return True, host_to_connect, ssh	
 	except paramiko.AuthenticationException:
 		return False, None, None
