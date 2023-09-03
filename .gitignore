@@ -29,3 +29,4 @@ installerTemp/
 packages/
 
 creds.bin
+known_hosts_file

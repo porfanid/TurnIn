@@ -113,9 +113,18 @@ def turn_in(username, password, host, temp_dir):
 		run_command_to_turn_in(host, username, password, host_to_connect, remote_dir, assignment, remote_paths)
 
 def add_ssh_keys(ssh):
-	for hostname, key_type, key_data in ssh_keys:
-		#for hostname, _, public_key_data in ssh_keys:
-		ssh.get_host_keys().add(hostname, 'ssh-rsa', paramiko.RSAKey(data=key_data))
+	known_hosts_path = "known_hosts_file"
+	if not os.path.exists(known_hosts_path):
+		with open(known_hosts_path, "a") as known_hosts_file:
+			for host_key in ssh_keys:
+				# Format the host key entry
+				host_key_entry = f"{host_key[0]} {host_key[1]} {host_key[2]}\n"
+				
+				# Write the host key entry to the known_hosts file
+				known_hosts_file.write(host_key_entry)
+
+	ssh.load_host_keys(known_hosts_path)
+	ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
 
 
 def getFiles():
@@ -142,9 +151,17 @@ def getFiles():
 def get_host(username, password, host):
 	try:
 		ssh = paramiko.SSHClient()
-		#add_ssh_keys(ssh)
-		ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
-		ssh.connect(proxy, username=username, password=password)
+		add_ssh_keys(ssh)
+		#ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
+		try:
+			ssh.connect(proxy, username=username, password=password)
+		except paramiko.ssh_exception.SSHException as e:
+			print("Wrong key")
+			message=QMessageBox()
+			message.setText(str(e))
+			message.setIcon(QMessageBox.Critical)
+			message.exec_()
+			exit()
 		_, ssh_stdout, ssh_stderr = ssh.exec_command("rupt")
 		servers=ssh_stdout.readlines()
 		host_to_connect = None
@@ -161,24 +178,28 @@ def get_host(username, password, host):
 			exit(-1)
 		else:
 			
-			
-			# store the data in an encrypted format
-			data = {
-				'username': username,
-				'password': password
-			}
-			serialized_data = json.dumps(data).encode('utf-8')
-			# Generate or retrieve encryption key
-			key = get_key()
-			cipher_suite = Fernet(key)
-			# Encrypt the serialized data
-			encrypted_data = cipher_suite.encrypt(serialized_data)
-			# Save the encrypted data to a file
-			with open('creds.bin', 'wb') as f:
-				f.write(encrypted_data)
+			confirm_msg = QMessageBox()
+			confirm_msg.setIcon(QMessageBox.Question)
+			confirm_msg.setText("Do you want to save your credentials?")
 
+			confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+			confirm_response = confirm_msg.exec_()
 
-
+			if confirm_response == QMessageBox.Yes:
+				# store the data in an encrypted format
+				data = {
+					'username': username,
+					'password': password
+				}
+				serialized_data = json.dumps(data).encode('utf-8')
+				# Generate or retrieve encryption key
+				key = get_key()
+				cipher_suite = Fernet(key)
+				# Encrypt the serialized data
+				encrypted_data = cipher_suite.encrypt(serialized_data)
+				# Save the encrypted data to a file
+				with open('creds.bin', 'wb') as f:
+					f.write(encrypted_data)
 			return True, host_to_connect, ssh	
 	except paramiko.AuthenticationException:
 		return False, None, None
@@ -225,10 +246,17 @@ def run_command_to_turn_in(host, username, password, host_to_connect, remote_dir
 		) as _:
 			ssh = paramiko.SSHClient()
 			ssh.load_system_host_keys()
-			# add_ssh_keys(ssh)
-			ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
+			add_ssh_keys(ssh)
+			#ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
 
-			ssh.connect('127.0.0.1', 10022, username=username, password=password)
+			try:
+				ssh.connect('127.0.0.1', 10022, username=username, password=password)
+			except paramiko.ssh_exception.SSHException as e:
+				message=QMessageBox()
+				message.setText(str(e))
+				message.setIcon(QMessageBox.Critical)
+				message.exec_()
+				exit()
 			turn_in_command = f"cd {remote_dir}&&yes|turnin {assignment} {' '.join(remote_paths)}"
 			_, ssh_stdout, ssh_stderr = ssh.exec_command(turn_in_command)
 			ssh.exec_command(f"rm -R {remote_dir}")
@@ -254,6 +282,31 @@ def get_key():
 		key = generate_key()
 	return key
 
+def get_credentials_from_file():
+	with open('creds.bin', 'rb') as f:
+		encrypted_data = f.read()
+
+	# Retrieve encryption key
+	key = get_key()
+	cipher_suite = Fernet(key)
+
+	# Decrypt the encrypted data
+	try:
+		decrypted_data = cipher_suite.decrypt(encrypted_data)
+	except InvalidToken as e:
+		msg = QMessageBox()
+		msg.setText("Something went wrong while reading the encrypted password.\nExiting...")
+		msg.exec_()
+		exit()
+
+
+	# Deserialize the decrypted data
+	deserialized_data = json.loads(decrypted_data.decode('utf-8'))
+
+	# Access username and password
+	username = deserialized_data['username']
+	password = deserialized_data['password']
+	return username, password
 
 
 ########################################################
@@ -266,39 +319,16 @@ if __name__ == '__main__':
 
 
 	if os.path.exists("creds.bin"):
-
+		username, password = get_credentials_from_file()
 		confirm_msg = QMessageBox()
 		confirm_msg.setIcon(QMessageBox.Question)
-		confirm_msg.setText("Do you want to use the account saved in the creds.bin file?")
+		confirm_msg.setText(f"Do you want to use the account \"{username}\" saved in the creds.bin file?")
 
 		confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
 		confirm_response = confirm_msg.exec_()
 
 		if confirm_response == QMessageBox.Yes:
-			with open('creds.bin', 'rb') as f:
-				encrypted_data = f.read()
-
-			# Retrieve encryption key
-			key = get_key()
-			cipher_suite = Fernet(key)
-
-			# Decrypt the encrypted data
-			try:
-				decrypted_data = cipher_suite.decrypt(encrypted_data)
-			except InvalidToken as e:
-				msg = QMessageBox()
-				msg.setText("Something went wrong while reading the encrypted password.\nExiting...")
-				msg.exec_()
-				exit()
-
-
-			# Deserialize the decrypted data
-			deserialized_data = json.loads(decrypted_data.decode('utf-8'))
-
-			# Access username and password
-			username = deserialized_data['username']
-			password = deserialized_data['password']
-
+			
 			turn_in(username, password, proxy, temp_dir)
 			app.quit()
 			exit()
