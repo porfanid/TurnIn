@@ -3,3 +3,4 @@ paramiko
 sentry-sdk
 pyqt5
 keyring
+requests

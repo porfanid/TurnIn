@@ -14,11 +14,14 @@ from cryptography.fernet import InvalidToken
 import keyring
 import base64
 
+import requests
+
 # os for the path basename to get the name and other controls
 import os
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QLineEdit, QGridLayout, QMessageBox, QFileDialog, QInputDialog
 
 from PyQt5 import QtGui, QtCore
+from PyQt5.QtGui import QDesktopServices
 # system, for the exit function and to get wether the platform is windows or linux
 from sys import platform, exit
 
@@ -309,12 +312,57 @@ def get_credentials_from_file():
 	password = deserialized_data['password']
 	return username, password
 
+def check_version():
+
+	# GitHub repository information
+	github_repo = "porfanid/TurnIn"  # Replace with the username and repository name
+	github_token = None  # Replace with your GitHub Personal Access Token if needed, or set to None
+
+	# Current version of your software
+	#current_version = "version3.1"
+	current_version = "version3.1"
+	# Construct the API URL
+	api_url = f"https://api.github.com/repos/{github_repo}/releases/latest"
+
+	# Include your GitHub token if you have rate limiting issues or need authentication
+	headers = {}
+	if github_token:
+		headers["Authorization"] = f"token {github_token}"
+
+	# Send a GET request to the GitHub API
+	response = requests.get(api_url, headers=headers)
+
+	if response.status_code == 200:
+		latest_release = response.json()
+		latest_version = latest_release["tag_name"]
+
+		if latest_version != current_version:
+			extension="deb"
+			if os.name == "nt" or "SystemRoot" in os.environ:
+				extension="exe"
+			link=f"https://github.com/porfanid/TurnIn/releases/download/{latest_version}/turnin.{extension}"
+			update_message=QMessageBox()
+			update_message.setWindowTitle("Update Required")
+			update_message.setText("Please update to the latest version")
+			download_button = update_message.addButton("Download", QMessageBox.AcceptRole)
+			def download_link(self):
+				QDesktopServices.openUrl(QtCore.QUrl(link))
+			download_button.clicked.connect(download_link)
+			update_message.exec_()
+			exit()
+		else:
+			print("Your software is up to date.")
+	else:
+		print(f"Failed to retrieve release information. Status code: {response.status_code}")
+
+
 
 ########################################################
 # Main Application starting
 ########################################################
 if __name__ == '__main__':
 	app = QApplication([])
+	check_version()
 	proxy="scylla.cs.uoi.gr"
 	temp_dir="turnin"
 

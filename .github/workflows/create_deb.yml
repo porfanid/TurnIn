@@ -26,7 +26,7 @@ jobs:
           echo "Architecture: all" >> deb-package/DEBIAN/control
           echo "Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>" >> deb-package/DEBIAN/control
           echo "Description: TurnIn App" >> deb-package/DEBIAN/control
-          echo "Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt5" >> deb-package/DEBIAN/control  # Specify dependencies
+          echo "Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt5, python3-requests" >> deb-package/DEBIAN/control  # Specify dependencies
 
           mkdir -p deb-package/usr/bin
           cp turnin.py deb-package/usr/bin
