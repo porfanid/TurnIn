@@ -335,10 +335,7 @@ def check_version():
 		latest_version = latest_release["tag_name"]
 
 		if latest_version != current_version:
-			extension="deb"
-			if os.name == "nt" or "SystemRoot" in os.environ:
-				extension="exe"
-			link=f"https://github.com/porfanid/TurnIn/releases/download/{latest_version}/turnin.{extension}"
+			link=f"https://github.com/porfanid/TurnIn/releases/tag/{latest_version}"
 			update_message=QMessageBox()
 			update_message.setWindowTitle("Update Required")
 			update_message.setText("Please update to the latest version")
