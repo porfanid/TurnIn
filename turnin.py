@@ -127,7 +127,7 @@ def add_ssh_keys(ssh):
 				known_hosts_file.write(host_key_entry)
 
 	ssh.load_host_keys(known_hosts_path)
-	ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
+	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 
 def getFiles():
@@ -155,7 +155,6 @@ def get_host(username, password, host, ask_to_save=False):
 	try:
 		ssh = paramiko.SSHClient()
 		add_ssh_keys(ssh)
-		#ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
 		try:
 			ssh.connect(proxy, username=username, password=password)
 		except paramiko.ssh_exception.SSHException as e:
@@ -251,7 +250,6 @@ def run_command_to_turn_in(host, username, password, host_to_connect, remote_dir
 			ssh = paramiko.SSHClient()
 			ssh.load_system_host_keys()
 			add_ssh_keys(ssh)
-			#ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())	
 
 			try:
 				ssh.connect('127.0.0.1', 10022, username=username, password=password)
