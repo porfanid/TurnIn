@@ -318,7 +318,7 @@ def check_version():
 
 	# Current version of your software
 	#current_version = "version3.1"
-	current_version = "version3.1"
+	current_version = "version3.2"
 	# Construct the API URL
 	api_url = f"https://api.github.com/repos/{github_repo}/releases/latest"
 
@@ -333,6 +333,8 @@ def check_version():
 	if response.status_code == 200:
 		latest_release = response.json()
 		latest_version = latest_release["tag_name"]
+		print(latest_version)
+		print(current_version)
 
 		if latest_version != current_version:
 			link=f"https://github.com/porfanid/TurnIn/releases/tag/{latest_version}"
