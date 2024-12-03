@@ -32,7 +32,7 @@ jobs:
           cp dist/turnin.exe ./turnin.exe
 
       - name: Upload EXE artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: turnin.exe
           path: turnin.exe
