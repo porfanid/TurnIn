@@ -5,6 +5,12 @@ import json
 import keyring
 from cryptography.fernet import Fernet, InvalidToken
 from PyQt6.QtWidgets import QMessageBox
+from os.path import expanduser, join
+
+def get_credentials_path():
+    """Get path to credentials file in user's home directory"""
+    home_dir = expanduser("~")
+    return join(home_dir, "creds.bin")
 
 def generate_key():
     """
@@ -51,7 +57,7 @@ def save_credentials(username, password):
     encrypted_data = cipher_suite.encrypt(serialized_data)
 
     # Save the encrypted data to file
-    with open('creds.bin', 'wb') as f:
+    with open(get_credentials_path(), 'wb') as f:
         f.write(encrypted_data)
 
 def load_credentials():
@@ -62,7 +68,7 @@ def load_credentials():
         tuple or None: (username, password) if successful, None otherwise
     """
     try:
-        with open('creds.bin', 'rb') as f:
+        with open(get_credentials_path(), 'rb') as f:
             encrypted_data = f.read()
 
         # Get encryption key

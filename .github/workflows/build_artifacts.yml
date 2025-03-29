@@ -1,20 +1,47 @@
-name: Create Debian Package
+name: Build Application Packages
 
 on:
   push:
     branches:
-      - master
+      - upgraded-to-app
 
 jobs:
-  build-and-push:
+  build-windows-exe:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Build Windows EXE
+        run: |
+          pyinstaller --onefile --icon=cse.logo.ico src/turnin.py
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-packages
+          path: dist/turnin.exe
+
+  build-debian-package:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.8
 
@@ -22,14 +49,14 @@ jobs:
         run: |
           mkdir -p turnin/DEBIAN
           echo "Package: turnin" >> turnin/DEBIAN/control
-          echo "Version: 3.2" >> turnin/DEBIAN/control
+          echo "Version: 3.3" >> turnin/DEBIAN/control
           echo "Architecture: all" >> turnin/DEBIAN/control
           echo "Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>" >> turnin/DEBIAN/control
           echo "Description: TurnIn App" >> turnin/DEBIAN/control
-          echo "Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt5, python3-requests" >> turnin/DEBIAN/control  # Specify dependencies
+          echo "Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt6, python3-requests" >> turnin/DEBIAN/control
 
           mkdir -p turnin/usr/bin
-          cp turnin.py turnin/usr/bin
+          cp src/turnin.py turnin/usr/bin
           chmod +x turnin/usr/bin/turnin.py
 
           mkdir -p turnin/usr/share/applications
@@ -48,5 +75,5 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: turnin.deb
+          name: application-packages
           path: turnin.deb

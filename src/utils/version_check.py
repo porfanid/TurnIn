@@ -7,7 +7,7 @@ from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtCore import QUrl
 import sys
 
-from config import APP_VERSION, REPO_OWNER, REPO_NAME
+from src.config import APP_VERSION, REPO_OWNER, REPO_NAME
 
 
 def check_version():
@@ -40,7 +40,7 @@ def check_version():
             latest_release = response.json()
             latest_version = latest_release["tag_name"]
 
-            if latest_version != current_version:
+            if latest_version != f"version{current_version}":
                 # Newer version is available
                 link = f"https://github.com/{github_repo}/releases/tag/{latest_version}"
 
@@ -48,7 +48,7 @@ def check_version():
                 update_message = QMessageBox()
                 update_message.setWindowTitle("Update Required")
                 update_message.setText(
-                    f"A newer version ({latest_version}) is available.\nYour version: {current_version}")
+                    f"A newer version ({latest_version}) is available.\nYour version: version{current_version}")
                 update_message.setInformativeText("Would you like to download the latest version?")
                 update_message.setIcon(QMessageBox.Icon.Information)
 

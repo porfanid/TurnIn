@@ -2,7 +2,7 @@
 
 # App Information
 APP_NAME = "TurnIn"
-APP_VERSION = "3.2"
+APP_VERSION = "3.3"
 REPO_OWNER = "porfanid"
 REPO_NAME = "TurnIn"
 

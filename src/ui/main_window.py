@@ -46,7 +46,7 @@ class UploadWorker(QObject):
             self.command_output.emit(output)
 
             if success:
-                self.upload_finished.emit(True, "Assignment submitted successfully!")
+                self.upload_finished.emit(True, "Please check the output message of the turnin for any errors")
             else:
                 self.upload_finished.emit(False, f"Error during submission: {output}")
         except Exception as e:
