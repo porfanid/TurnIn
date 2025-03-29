@@ -30,7 +30,7 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-packages
+          name: application-package-exe
           path: dist/turnin.exe
 
   build-debian-package:
@@ -75,5 +75,5 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-packages
+          name: application-package-deb
           path: turnin.deb
