@@ -1,6 +1,6 @@
 sshtunnel
 paramiko
 sentry-sdk
-pyqt5
+pyqt6
 keyring
 requests
