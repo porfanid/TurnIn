@@ -5,7 +5,6 @@ import os
 import paramiko
 import sshtunnel
 from PyQt6.QtWidgets import QMessageBox
-from config import SSH_KEYS
 
 def add_ssh_keys(ssh):
     """
@@ -14,16 +13,7 @@ def add_ssh_keys(ssh):
     Args:
         ssh (paramiko.SSHClient): The SSH client to configure
     """
-    known_hosts_path = "known_hosts_file"
-    if not os.path.exists(known_hosts_path):
-        with open(known_hosts_path, "a") as known_hosts_file:
-            for host_key in SSH_KEYS:
-                # Format the host key entry
-                host_key_entry = f"{host_key[0]} {host_key[1]} {host_key[2]}\n"
-                # Write the host key entry to the known_hosts file
-                known_hosts_file.write(host_key_entry)
-
-    ssh.load_host_keys(known_hosts_path)
+    # This needs to be fixed to not rely on SSH_KEYS from config
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 def get_available_server(ssh):
@@ -76,133 +66,142 @@ def connect_to_proxy(username, password, proxy_host):
         QMessageBox.critical(None, "SSH Error", str(e))
         return False, None, None
 
-def upload_files(files, username, password, ssh, host, temp_dir):
-    """
-    Upload files to the remote server
-
-    Args:
-        files (list): List of local file paths to upload
-        username (str): SSH username
-        password (str): SSH password
-        ssh (paramiko.SSHClient): SSH client
-        host (str): Host to connect to
-        temp_dir (str): Remote temporary directory
-
-    Returns:
-        tuple: (remote_dir (str), remote_paths (list))
-    """
+def upload_files(files, username, password, ssh, host, temp_dir, progress_callback=None):
+    """Upload files with progress reporting"""
     if not files:
-        QMessageBox.warning(None, "No Files", "No files were selected. Cannot continue.")
         return None, None
 
+    # Get home directory
     _, ssh_stdout, _ = ssh.exec_command("pwd")
     home_dir = ssh_stdout.readlines()[0].strip()
 
+    # Setup SFTP connection
     transport = paramiko.Transport((host, 22))
     transport.connect(None, username, password)
     sftp = paramiko.SFTPClient.from_transport(transport)
 
     remote_dir = f"{home_dir}/{temp_dir}/"
 
+    # Try to create directory (ignore if exists)
     try:
         sftp.mkdir(remote_dir)
     except:
-        pass  # Directory might already exist
+        pass
+
+    # Safe progress reporting
+    if progress_callback:
+        try:
+            progress_callback(20, "Starting file uploads...")
+        except Exception:
+            pass  # Ignore callback errors
 
     remote_paths = []
-    for localpath in files:
+    total_files = len(files)
+    progress_range = 60  # Progress from 20% to 80%
+
+    for idx, localpath in enumerate(files):
         name = os.path.basename(localpath)
         filepath = f"{remote_dir}{name}"
+
+        if progress_callback:
+            current_progress = 20 + (idx * progress_range / total_files)
+            try:
+                progress_callback(current_progress, f"Uploading file {idx+1}/{total_files}: {name}")
+            except Exception:
+                pass  # Ignore callback errors
+
+        # Upload the file
         try:
             sftp.put(localpath, filepath)
             remote_paths.append(name)
+
+            if progress_callback:
+                current_progress = 20 + ((idx + 1) * progress_range / total_files)
+                try:
+                    progress_callback(current_progress, f"Uploaded {idx+1}/{total_files} files")
+                except Exception:
+                    pass
         except Exception as e:
-            QMessageBox.warning(None, "Upload Error", f"Could not upload {name}: {str(e)}")
+            print(f"Upload error: {str(e)}")
 
     return remote_dir, remote_paths
 
-def submit_assignment(host, username, password, host_to_connect, remote_dir, assignment, remote_paths):
-    """
-    Submit assignment through SSH tunnel
-
-    Args:
-        host (str): Proxy host
-        username (str): SSH username
-        password (str): SSH password
-        host_to_connect (str): Target host
-        remote_dir (str): Remote directory with files
-        assignment (str): Assignment identifier
-        remote_paths (list): List of remote file paths
-    """
-    with sshtunnel.open_tunnel(
-            (host, 22),
-            ssh_username=username,
-            ssh_password=password,
-            remote_bind_address=(host_to_connect, 22),
-            local_bind_address=('0.0.0.0', 10022)
-    ) as _:
-        ssh = paramiko.SSHClient()
-        ssh.load_system_host_keys()
-        add_ssh_keys(ssh)
-
-        try:
-            ssh.connect('127.0.0.1', 10022, username=username, password=password)
-            turn_in_command = f"cd {remote_dir} && yes | turnin {assignment} {' '.join(remote_paths)}"
-            _, ssh_stdout, ssh_stderr = ssh.exec_command(turn_in_command)
-
-            # Clean up temporary directory
-            ssh.exec_command(f"rm -R {remote_dir}")
-
-            # Show results
-            stdout = ''.join(ssh_stdout.readlines())
-            stderr = ''.join(ssh_stderr.readlines())
-            QMessageBox.information(None, "Submission Result", f"{stdout}\n\n{stderr}")
-
-            ssh.close()
-        except paramiko.ssh_exception.SSHException as e:
-            QMessageBox.critical(None, "SSH Error", str(e))
-
-
 
 def submit_files(proxy_host, host_to_connect, username, password, assignment,
-                file_list, temp_dir, ssh_client=None):
-    """
-    Submit files to the assignment submission server
-
-    Args:
-        proxy_host (str): SSH proxy hostname
-        host_to_connect (str): Target host to connect through proxy
-        username (str): SSH username
-        password (str): SSH password
-        assignment (str): Assignment name/ID
-        file_list (list): List of files to submit
-        temp_dir (str): Temporary directory for processing
-        ssh_client (paramiko.SSHClient, optional): Existing SSH client connection
-
-    Returns:
-        bool: True if submission was successful
-    """
+                 file_list, temp_dir, ssh_client=None, progress_callback=None):
+    """Submit files to the assignment submission server"""
     # Use existing SSH client or create a new one
     ssh = ssh_client or connect_to_proxy(username, password, proxy_host)[2]
 
+    if progress_callback:
+        try:
+            progress_callback(10, "Connected to SSH server...")
+        except Exception:
+            pass
+
     # Upload files to the server
-    remote_dir, remote_paths = upload_files(file_list, username, password, ssh, proxy_host, temp_dir)
+    remote_dir, remote_paths = upload_files(file_list, username, password, ssh, proxy_host, temp_dir, progress_callback)
 
     if not remote_dir or not remote_paths:
-        return False
+        return False, "Failed to upload files"
 
-    # Submit the assignment
+    if progress_callback:
+        try:
+            progress_callback(80, "Files uploaded. Creating SSH tunnel...")
+        except Exception:
+            pass
+
+    # Run the turnin command through SSH tunnel
     try:
-        submit_assignment(
-            proxy_host,
-            username,
-            password,
-            host_to_connect,
-            remote_dir,
-            assignment,
-            remote_paths
-        )
-        return True
+        # Create SSH tunnel to the target host through the proxy
+        with sshtunnel.SSHTunnelForwarder(
+            (proxy_host, 22),
+            ssh_username=username,
+            ssh_password=password,
+            remote_bind_address=(host_to_connect, 22),
+            local_bind_address=('127.0.0.1', 0)  # Let system choose port
+        ) as tunnel:
+            # Create a new SSH client to connect to the tunneled host
+            target_ssh = paramiko.SSHClient()
+            target_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            # Connect through the tunnel
+            target_ssh.connect('127.0.0.1',
+                             port=tunnel.local_bind_port,
+                             username=username,
+                             password=password)
+
+            if progress_callback:
+                try:
+                    progress_callback(85, "Tunnel created. Running turnin command...")
+                except Exception:
+                    pass
+
+            # Build and execute the turnin command
+            cmd = f"cd {remote_dir} && turnin {assignment} {' '.join(remote_paths)}"
+            print(cmd)
+            stdin, stdout, stderr = target_ssh.exec_command(cmd, timeout=30)
+            # Send "y" to the command to confirm any prompts
+            stdin.write('y\n')
+            stdin.flush()
+            stdin.write('y\n')
+            stdin.flush()
+
+
+            # Gather output
+            output_stdout = stdout.read().decode('utf-8', errors='replace')
+            output_stderr = stderr.read().decode('utf-8', errors='replace')
+            output = output_stdout + output_stderr
+
+            # Close connection
+            target_ssh.close()
+
+        if progress_callback:
+            try:
+                progress_callback(100, "Assignment submitted successfully!")
+            except Exception as e:
+                return False, f"Error updating progress bar: {str(e)}"
+
+        return True, output
     except Exception as e:
-        QMessageBox.critical(None, "Submission Error", f"Error submitting files: {str(e)}")
-        return False
+        return False, f"Error executing turnin command: {str(e)}"

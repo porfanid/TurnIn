@@ -4,10 +4,57 @@ Main window for the TurnIn application
 import os
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel, QComboBox, QFileDialog,
-                             QListWidget, QMessageBox, QSplitter, QGroupBox, QScrollArea, QLineEdit)
-from PyQt6.QtCore import Qt
+                             QListWidget, QMessageBox, QSplitter, QGroupBox, QScrollArea, QLineEdit, QProgressBar)
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QThread
 from src.utils.ssh import submit_files, connect_to_proxy
 from src.ui.about_window import AboutWindow
+
+class UploadWorker(QObject):
+    """Worker to handle file uploads in a background thread"""
+    progress_updated = pyqtSignal(float, str)
+    upload_finished = pyqtSignal(bool, str)
+    command_output = pyqtSignal(str)
+
+    def __init__(self, proxy_host, host_to_connect, username, password,
+                 assignment, files, temp_dir, ssh=None):
+        super().__init__()
+        self.proxy_host = proxy_host
+        self.host_to_connect = host_to_connect
+        self.username = username
+        self.password = password
+        self.assignment = assignment
+        self.files = files
+        self.temp_dir = temp_dir
+        self.ssh = ssh
+
+    def run(self):
+        """Run the upload process"""
+        try:
+            success, output = submit_files(
+                self.proxy_host,
+                self.host_to_connect,
+                self.username,
+                self.password,
+                self.assignment,
+                self.files,
+                self.temp_dir,
+                self.ssh,
+                progress_callback=self.update_progress
+            )
+
+            # Emit the command output
+            self.command_output.emit(output)
+
+            if success:
+                self.upload_finished.emit(True, "Assignment submitted successfully!")
+            else:
+                self.upload_finished.emit(False, f"Error during submission: {output}")
+        except Exception as e:
+            self.upload_finished.emit(False, f"Error submitting files: {str(e)}")
+
+    def update_progress(self, percent, message):
+        """Update progress display"""
+        self.progress_updated.emit(percent, message)
 
 
 class MainWindow(QMainWindow):
@@ -99,12 +146,12 @@ class MainWindow(QMainWindow):
         splitter.setSizes([200, 600])
 
         # Submit button
-        submit_btn = QPushButton("Submit Assignment")
-        submit_btn.setMinimumHeight(50)
-        submit_btn.setStyleSheet("font-size: 16px; font-weight: bold;")
-        submit_btn.clicked.connect(self.submit_assignment)
+        self.submit_btn = QPushButton("Submit Assignment")  # Store as self.submit_btn
+        self.submit_btn.setMinimumHeight(50)
+        self.submit_btn.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.submit_btn.clicked.connect(self.submit_assignment)
 
-        main_layout.addWidget(submit_btn)
+        main_layout.addWidget(self.submit_btn)
 
         self.setup_menu()
 
@@ -166,36 +213,111 @@ class MainWindow(QMainWindow):
         self.selected_files = []
 
     def submit_assignment(self):
-                    """Submit the selected files for the chosen assignment"""
-                    if not self.selected_files:
-                        QMessageBox.warning(self, "Submission Error", "No files selected for submission.")
-                        return
+        """Submit the selected files for the chosen assignment"""
+        if not self.selected_files:
+            QMessageBox.warning(self, "Submission Error", "No files selected for submission.")
+            return
 
-                    assignment = self.assignment_input.text().strip()
-                    if not assignment:
-                        QMessageBox.warning(self, "Submission Error", "Please enter an assignment name.")
-                        return
+        assignment = self.assignment_input.text().strip()
+        if not assignment:
+            QMessageBox.warning(self, "Submission Error", "Please enter an assignment name.")
+            return
 
-                    # Confirmation dialog
-                    reply = QMessageBox.question(
-                        self,
-                        "Confirm Submission",
-                        f"Are you sure you want to submit {len(self.selected_files)} file(s) for assignment '{assignment}'?",
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                    )
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            "Confirm Submission",
+            f"Are you sure you want to submit {len(self.selected_files)} file(s) for assignment '{assignment}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
 
-                    if reply == QMessageBox.StandardButton.Yes:
-                        try:
-                            submit_files(
-                                self.proxy_host,
-                                self.host_to_connect,
-                                self.username,
-                                self.password,
-                                assignment,
-                                self.selected_files,
-                                self.temp_dir,
-                                self.ssh
-                            )
-                            QMessageBox.information(self, "Success", "Assignment submitted successfully!")
-                        except Exception as e:
-                            QMessageBox.critical(self, "Submission Error", f"Error submitting files: {str(e)}")
+        if reply == QMessageBox.StandardButton.Yes:
+            # Setup UI for progress
+            self.setup_progress_ui()
+            self.submit_btn.setEnabled(False)
+
+            # Create output area if it doesn't exist
+            if not hasattr(self, 'output_area'):
+                self.output_area = QScrollArea()
+                self.output_text = QLabel()
+                self.output_text.setWordWrap(True)
+                self.output_area.setWidget(self.output_text)
+                self.output_area.setWidgetResizable(True)
+                main_layout = self.centralWidget().layout()
+                main_layout.insertWidget(main_layout.count() - 1, self.output_area)
+                self.output_area.hide()
+
+            # Create worker and thread
+            self.thread = QThread()
+            self.worker = UploadWorker(
+                self.proxy_host,
+                self.host_to_connect,
+                self.username,
+                self.password,
+                assignment,
+                self.selected_files,
+                self.temp_dir,
+                self.ssh
+            )
+
+            # Set up connections
+            self.worker.moveToThread(self.thread)
+            self.thread.started.connect(self.worker.run)
+
+            # Use queued connections for thread safety
+            self.worker.progress_updated.connect(self.update_progress, Qt.ConnectionType.QueuedConnection)
+            self.worker.upload_finished.connect(self.handle_upload_finished, Qt.ConnectionType.QueuedConnection)
+            self.worker.command_output.connect(self.display_command_output, Qt.ConnectionType.QueuedConnection)
+
+            # Clean up connections
+            self.worker.upload_finished.connect(self.thread.quit)
+            self.worker.upload_finished.connect(self.worker.deleteLater)
+            self.thread.finished.connect(self.thread.deleteLater)
+            # Start the thread
+            self.thread.start()
+
+    def display_command_output(self, text):
+        """Display command output in the output area"""
+        self.output_text.setText(text)
+        self.output_area.show()
+
+    def setup_progress_ui(self):
+        """Set up progress bar and status label"""
+        # Create progress widget if it doesn't exist
+        if not hasattr(self, 'progress_widget'):
+            self.progress_widget = QWidget(self)
+            progress_layout = QVBoxLayout(self.progress_widget)
+
+            # Progress bar
+            self.progress_bar = QProgressBar()
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+
+            # Status label
+            self.status_label = QLabel("Preparing to upload...")
+
+            # Add to layout
+            progress_layout.addWidget(self.status_label)
+            progress_layout.addWidget(self.progress_bar)
+
+            # Add to main layout - place before the submit button
+            main_layout = self.centralWidget().layout()
+            main_layout.insertWidget(main_layout.count() - 1, self.progress_widget)
+        # Show the progress widget
+        self.progress_widget.show()
+        # Disable submit button during upload
+
+    def update_progress(self, percent, message):
+        """Update progress bar and status message"""
+        self.progress_bar.setValue(int(percent))
+        self.status_label.setText(message)
+
+    def handle_upload_finished(self, success, message):
+        """Handle upload completion"""
+        # Re-enable submit button
+        self.submit_btn.setEnabled(True)
+
+        if success:
+            QMessageBox.information(self, "Success", message)
+        else:
+            QMessageBox.critical(self, "Submission Error", message)
