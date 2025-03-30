@@ -9,13 +9,18 @@ import logging
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 import sentry_sdk
+from pathlib import Path
+
+log_dir = Path.home() / ".turnin"
+log_dir.mkdir(exist_ok=True)
+log_file = log_dir / "turnin.log"
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('turnin.log'),
+        logging.FileHandler(log_file),
         logging.StreamHandler()
     ]
 )

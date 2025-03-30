@@ -10,7 +10,7 @@ from os.path import expanduser, join
 def get_credentials_path():
     """Get path to credentials file in user's home directory"""
     home_dir = expanduser("~")
-    return join(home_dir, "creds.bin")
+    return join(home_dir, ".turnin", "creds.bin")
 
 def generate_key():
     """

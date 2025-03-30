@@ -8,7 +8,6 @@ on:
 jobs:
   build-windows-exe:
     runs-on: windows-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,17 +24,61 @@ jobs:
 
       - name: Build Windows EXE
         run: |
-          pyinstaller --onefile --icon=cse.logo.ico src/turnin.py
+          # Create spec file for PyInstaller
+          echo 'from PyInstaller.utils.hooks import collect_all' > turnin.spec
+          echo 'from PyInstaller.utils.hooks import collect_submodules' >> turnin.spec
+          echo "import os" >> turnin.spec
+          echo "import sys" >> turnin.spec
+          echo "src_path = os.path.abspath('src')" >> turnin.spec
+          echo "if src_path not in sys.path: sys.path.append(src_path)" >> turnin.spec
+          echo "ui_datas, ui_binaries, ui_hiddenimports = collect_all('ui', src_path)" >> turnin.spec
+          echo "utils_datas, utils_binaries, utils_hiddenimports = collect_all('utils', src_path)" >> turnin.spec
+          echo "src_datas = [(os.path.join('src', '*.py'), '.')]" >> turnin.spec
+          echo "a = Analysis(['src/turnin.py']," >> turnin.spec
+          echo "             pathex=[src_path]," >> turnin.spec
+          echo "             binaries=[]," >> turnin.spec
+          echo "             datas=[(os.path.abspath('cse.logo.png'), '.')]," >> turnin.spec
+          echo "             hiddenimports=[]," >> turnin.spec
+          echo "             hookspath=[]," >> turnin.spec
+          echo "             runtime_hooks=[]," >> turnin.spec
+          echo "             excludes=[]," >> turnin.spec
+          echo "             win_no_prefer_redirects=False," >> turnin.spec
+          echo "             win_private_assemblies=False," >> turnin.spec
+          echo "             cipher=None," >> turnin.spec
+          echo "             noarchive=False)" >> turnin.spec
+          echo "pyz = PYZ(a.pure, a.zipped_data," >> turnin.spec
+          echo "             cipher=None)" >> turnin.spec
+          echo "exe = EXE(pyz," >> turnin.spec
+          echo "          a.scripts," >> turnin.spec
+          echo "          a.binaries," >> turnin.spec
+          echo "          a.zipfiles," >> turnin.spec
+          echo "          a.datas," >> turnin.spec
+          echo "          []," >> turnin.spec
+          echo "          name='turnin'," >> turnin.spec
+          echo "          debug=False," >> turnin.spec
+          echo "          bootloader_ignore_signals=False," >> turnin.spec
+          echo "          strip=False," >> turnin.spec
+          echo "          upx=True," >> turnin.spec
+          echo "          upx_exclude=[]," >> turnin.spec
+          echo "          runtime_tmpdir=None," >> turnin.spec
+          echo "          console=False," >> turnin.spec
+          echo "          disable_windowed_traceback=False," >> turnin.spec
+          echo "          target_arch=None," >> turnin.spec
+          echo "          codesign_identity=None," >> turnin.spec
+          echo "          entitlements_file=None," >> turnin.spec
+          echo "          icon='cse.logo.ico')" >> turnin.spec
+
+          # Run PyInstaller with the spec file
+          pyinstaller turnin.spec
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-package-exe
+          name: application-packages
           path: dist/turnin.exe
 
   build-debian-package:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,26 +91,51 @@ jobs:
       - name: Prepare Debian package directory
         run: |
           mkdir -p turnin/DEBIAN
-          echo "Package: turnin" >> turnin/DEBIAN/control
-          echo "Version: 3.3" >> turnin/DEBIAN/control
-          echo "Architecture: all" >> turnin/DEBIAN/control
-          echo "Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>" >> turnin/DEBIAN/control
-          echo "Description: TurnIn App" >> turnin/DEBIAN/control
-          echo "Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt6, python3-requests" >> turnin/DEBIAN/control
+          # Create control file
+          cat > turnin/DEBIAN/control << EOF
+          Package: turnin
+          Version: 3.3
+          Architecture: all
+          Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>
+          Description: TurnIn App for submitting assignments
+          Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt6, python3-requests
+          EOF
 
+          # Create postinst script to set proper permissions
+          cat > turnin/DEBIAN/postinst << EOF
+          #!/bin/sh
+          chmod 755 /usr/bin/turnin
+          exit 0
+          EOF
+          chmod +x turnin/DEBIAN/postinst
+
+          # Create wrapper script for proper execution
           mkdir -p turnin/usr/bin
-          cp src/turnin.py turnin/usr/bin
-          chmod +x turnin/usr/bin/turnin.py
+          cat > turnin/usr/bin/turnin << EOF
+          #!/bin/bash
+          python3 /usr/share/turnin/turnin.py "\$@"
+          EOF
+          chmod +x turnin/usr/bin/turnin
 
+          # Create application directory and copy files
+          mkdir -p turnin/usr/share/turnin
+          cp -r src/* turnin/usr/share/turnin/
+          cp cse.logo.png turnin/usr/share/turnin/
+
+          # Create desktop file
           mkdir -p turnin/usr/share/applications
-          echo "[Desktop Entry]" >> turnin/usr/share/applications/turnin.desktop
-          echo "Name=TurnIn" >> turnin/usr/share/applications/turnin.desktop
-          echo "Exec=python3 /usr/bin/turnin.py" >> turnin/usr/share/applications/turnin.desktop
-          echo "Icon=/usr/share/icons/cse.logo.png" >> turnin/usr/share/applications/turnin.desktop
-          echo "Type=Application" >> turnin/usr/share/applications/turnin.desktop
+          cat > turnin/usr/share/applications/turnin.desktop << EOF
+          [Desktop Entry]
+          Name=TurnIn
+          Exec=/usr/bin/turnin
+          Icon=/usr/share/icons/turnin/cse.logo.png
+          Type=Application
+          Categories=Education;Development;
+          EOF
 
-          mkdir -p turnin/usr/share/icons
-          cp cse.logo.png turnin/usr/share/icons
+          # Copy icon
+          mkdir -p turnin/usr/share/icons/turnin
+          cp cse.logo.png turnin/usr/share/icons/turnin/
 
       - name: Build Debian package
         run: dpkg-deb --build turnin
@@ -75,5 +143,5 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-package-deb
+          name: application-packages
           path: turnin.deb
