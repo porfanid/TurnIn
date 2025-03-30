@@ -20,16 +20,38 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyinstaller
+          pip install keyring
           pip install -r requirements.txt
+
+      - name: Fix import paths
+        run: |
+          # Create a hook file to handle hidden imports
+          mkdir -p hooks
+          @'
+          from PyInstaller.utils.hooks import collect_all
+
+          # Add all these modules as hidden imports
+          hiddenimports = [
+              'keyring',
+              'keyring.backends',
+              'cryptography',
+              'sentry_sdk',
+              'sshtunnel',
+              'paramiko',
+          ]
+
+          # Collect all submodules for these packages
+          datas, binaries, hiddenimports_collected = collect_all('keyring')
+          hiddenimports.extend(hiddenimports_collected)
+          '@ > hooks/hook-keyring.py
 
       - name: Create entry script
         run: |
-          # Create a main entry script that properly sets up the path
           @'
           import os
           import sys
 
-          # Add the current directory to path
+          # Add the current directory to path for finding src package
           base_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
           sys.path.insert(0, base_dir)
 
@@ -40,14 +62,21 @@ jobs:
               main()
           '@ > main_entry.py
 
+      - name: Fix relative imports
+        run: |
+          # Fix the relative imports in login_window.py
+          $content = Get-Content src\ui\login_window.py -Raw
+          $content = $content -replace 'from src\.utils', 'from ..utils'
+          $content | Out-File src\ui\login_window.py -Encoding utf8
+
       - name: Build Windows EXE
         run: |
-          pyinstaller --name turnin --onefile --windowed --icon=cse.logo.ico --add-data "cse.logo.png;." --add-data "src;src" main_entry.py
+          pyinstaller --name turnin --onefile --windowed --icon=cse.logo.ico --add-data "cse.logo.png;." --add-data "src;src" --additional-hooks-dir=hooks main_entry.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-package-exe
+          name: application-packages
           path: dist/turnin.exe
 
   build-debian-package:
@@ -71,7 +100,7 @@ jobs:
           Architecture: all
           Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>
           Description: TurnIn App for submitting assignments
-          Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt6, python3-requests
+          Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt6, python3-requests, python3-keyring, python3-cryptography
           EOF
 
           # Create postinst script to set proper permissions
@@ -82,13 +111,22 @@ jobs:
           EOF
           chmod +x turnin/DEBIAN/postinst
 
+          # Create wrapper script for proper execution
+          mkdir -p turnin/usr/bin
+          cat > turnin/usr/bin/turnin << EOF
+          #!/bin/bash
+          cd /usr/share/turnin
+          python3 /usr/share/turnin/main.py "\$@"
+          EOF
+          chmod +x turnin/usr/bin/turnin
+
           # Create main entry script
           mkdir -p turnin/usr/share/turnin
           cat > turnin/usr/share/turnin/main.py << EOF
           import os
           import sys
 
-          # Add the directory to path
+          # Add the current directory to path
           base_dir = os.path.abspath(os.path.dirname(__file__))
           sys.path.insert(0, base_dir)
 
@@ -99,21 +137,16 @@ jobs:
               main()
           EOF
 
-          # Create wrapper script for proper execution
-          mkdir -p turnin/usr/bin
-          cat > turnin/usr/bin/turnin << EOF
-          #!/bin/bash
-          python3 /usr/share/turnin/main.py "\$@"
-          EOF
-          chmod +x turnin/usr/bin/turnin
-
           # Copy all source files
           mkdir -p turnin/usr/share/turnin/src
           cp -r src/* turnin/usr/share/turnin/src/
           # Make sure we have __init__.py files for proper package imports
           touch turnin/usr/share/turnin/src/__init__.py
           find turnin/usr/share/turnin/src -type d -exec touch {}"/__init__.py" \;
-          
+
+          # Fix the relative imports in login_window.py
+          sed -i 's/from src\.utils/from ..utils/g' turnin/usr/share/turnin/src/ui/login_window.py
+
           # Copy resources
           cp cse.logo.png turnin/usr/share/turnin/
 
@@ -138,5 +171,5 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-package-deb
+          name: application-packages
           path: turnin.deb
