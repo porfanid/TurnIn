@@ -56,16 +56,17 @@ jobs:
           }
 
       - name: Build Windows EXE
-        run: |
-          pyinstaller --name turnin --onefile --windowed --icon=cse.logo.ico ^
-            --add-data "cse.logo.png;." ^
-            --additional-hooks-dir=hooks ^
-            --hidden-import=keyring ^
-            --hidden-import=cryptography ^
-            --hidden-import=sentry_sdk ^
-            --hidden-import=paramiko ^
-            --hidden-import=sshtunnel ^
-            src/turnin.py
+        shell: cmd
+        run: >
+          pyinstaller --name turnin --onefile --windowed --icon=cse.logo.ico
+          --add-data "cse.logo.png;."
+          --additional-hooks-dir=hooks
+          --hidden-import=keyring
+          --hidden-import=cryptography
+          --hidden-import=sentry_sdk
+          --hidden-import=paramiko
+          --hidden-import=sshtunnel
+          src/turnin.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
