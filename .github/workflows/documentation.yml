@@ -1,0 +1,40 @@
+name: Deploy Docusaurus Documentation
+
+on:
+  push:
+    branches:
+      - upgraded-to-app  # or your default branch
+    paths:
+      - 'edit-documentation/TurnIn/**'  # only trigger on changes to docs
+
+jobs:
+  deploy:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'edit-documentation/TurnIn/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: edit-documentation/TurnIn
+        run: npm ci
+
+      - name: Build website
+        working-directory: edit-documentation/TurnIn
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./edit-documentation/TurnIn/build
+          publish_branch: gh-pages
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
