@@ -44,9 +44,19 @@ jobs:
           hiddenimports.extend(more_imports)
           '@ > hooks/hook-extras.py
 
+      # Create a separate script that fixes imports in Python files
+      - name: Fix imports in Python files
+        shell: powershell
+        run: |
+          $files = Get-ChildItem -Path src -Include *.py -Recurse
+          foreach ($file in $files) {
+            $content = Get-Content -Path $file.FullName
+            $newContent = $content -replace 'from src\.', 'from ' -replace 'from ..', 'from src.'
+            Set-Content -Path $file.FullName -Value $newContent
+          }
+
       - name: Build Windows EXE
         run: |
-          # Use the original imports - don't modify source files
           pyinstaller --name turnin --onefile --windowed --icon=cse.logo.ico ^
             --add-data "cse.logo.png;." ^
             --additional-hooks-dir=hooks ^
@@ -60,7 +70,7 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-packages
+          name: application-packages-exe
           path: dist/turnin.exe
 
   build-debian-package:
@@ -74,6 +84,16 @@ jobs:
         with:
           python-version: 3.8
 
+      - name: Fix imports in Python files
+        run: |
+          # Create a backup of the original files
+          mkdir -p backup_src
+          cp -r src backup_src/
+          
+          # Find and fix all import statements
+          find src -name "*.py" -exec sed -i 's/from src\./from /g' {} \;
+          find src -name "*.py" -exec sed -i 's/from \.\./from src./g' {} \;
+
       - name: Prepare Debian package directory
         run: |
           mkdir -p turnin/DEBIAN
@@ -86,7 +106,7 @@ jobs:
           Description: TurnIn App for submitting assignments
           Depends: python3-sshtunnel, python3-paramiko, python3-sentry-sdk, python3-pyqt6, python3-requests, python3-keyring, python3-cryptography
           EOF
-
+          
           # Create postinst script to set proper permissions
           cat > turnin/DEBIAN/postinst << EOF
           #!/bin/sh
@@ -96,32 +116,32 @@ jobs:
           exit 0
           EOF
           chmod +x turnin/DEBIAN/postinst
-
+          
           # Create logs directory
           mkdir -p turnin/var/log/turnin
           chmod 777 turnin/var/log/turnin
-
-          # Create wrapper script for proper execution
+          
+          # Create wrapper script that includes PYTHONPATH
           mkdir -p turnin/usr/bin
           cat > turnin/usr/bin/turnin << EOF
           #!/bin/bash
+          export PYTHONPATH=/usr/share/turnin
           python3 /usr/share/turnin/turnin.py "\$@"
           EOF
           chmod +x turnin/usr/bin/turnin
-
+          
           # Create application directory
           mkdir -p turnin/usr/share/turnin
           
           # Copy all Python files preserving original structure
           cp -r src/* turnin/usr/share/turnin/
-          cp src/turnin.py turnin/usr/share/turnin/
           
-          # Add __init__.py files where needed
+          # Create empty __init__.py files for proper package structure
           find turnin/usr/share/turnin -type d -exec touch {}/__init__.py \;
           
           # Copy resources
           cp cse.logo.png turnin/usr/share/turnin/
-
+          
           # Create desktop file
           mkdir -p turnin/usr/share/applications
           cat > turnin/usr/share/applications/turnin.desktop << EOF
@@ -132,7 +152,7 @@ jobs:
           Type=Application
           Categories=Education;Development;
           EOF
-
+          
           # Copy icon
           mkdir -p turnin/usr/share/icons/turnin
           cp cse.logo.png turnin/usr/share/icons/turnin/
