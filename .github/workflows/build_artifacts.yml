@@ -51,7 +51,10 @@ jobs:
           $files = Get-ChildItem -Path src -Include *.py -Recurse
           foreach ($file in $files) {
             $content = Get-Content -Path $file.FullName
-            $newContent = $content -replace 'from src\.', 'from ' -replace 'from ..', 'from src.'
+            # First, replace 'from src.' with 'from '
+            $newContent = $content -replace 'from src\.', 'from '
+            # Then, replace 'from ..' with 'from src.' but avoid creating 'src..' 
+            $newContent = $newContent -replace '(?<!src)from \.\.', 'from src.'
             Set-Content -Path $file.FullName -Value $newContent
           }
 
