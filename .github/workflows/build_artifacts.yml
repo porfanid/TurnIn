@@ -22,59 +22,32 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
+      - name: Create entry script
+        run: |
+          # Create a main entry script that properly sets up the path
+          @'
+          import os
+          import sys
+
+          # Add the current directory to path
+          base_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+          sys.path.insert(0, base_dir)
+
+          # Import the main function from src.turnin
+          from src.turnin import main
+
+          if __name__ == "__main__":
+              main()
+          '@ > main_entry.py
+
       - name: Build Windows EXE
         run: |
-          # Create spec file for PyInstaller
-          echo 'from PyInstaller.utils.hooks import collect_all' > turnin.spec
-          echo 'from PyInstaller.utils.hooks import collect_submodules' >> turnin.spec
-          echo "import os" >> turnin.spec
-          echo "import sys" >> turnin.spec
-          echo "src_path = os.path.abspath('src')" >> turnin.spec
-          echo "if src_path not in sys.path: sys.path.append(src_path)" >> turnin.spec
-          echo "ui_datas, ui_binaries, ui_hiddenimports = collect_all('ui', src_path)" >> turnin.spec
-          echo "utils_datas, utils_binaries, utils_hiddenimports = collect_all('utils', src_path)" >> turnin.spec
-          echo "src_datas = [(os.path.join('src', '*.py'), '.')]" >> turnin.spec
-          echo "a = Analysis(['src/turnin.py']," >> turnin.spec
-          echo "             pathex=[src_path]," >> turnin.spec
-          echo "             binaries=[]," >> turnin.spec
-          echo "             datas=[(os.path.abspath('cse.logo.png'), '.')]," >> turnin.spec
-          echo "             hiddenimports=[]," >> turnin.spec
-          echo "             hookspath=[]," >> turnin.spec
-          echo "             runtime_hooks=[]," >> turnin.spec
-          echo "             excludes=[]," >> turnin.spec
-          echo "             win_no_prefer_redirects=False," >> turnin.spec
-          echo "             win_private_assemblies=False," >> turnin.spec
-          echo "             cipher=None," >> turnin.spec
-          echo "             noarchive=False)" >> turnin.spec
-          echo "pyz = PYZ(a.pure, a.zipped_data," >> turnin.spec
-          echo "             cipher=None)" >> turnin.spec
-          echo "exe = EXE(pyz," >> turnin.spec
-          echo "          a.scripts," >> turnin.spec
-          echo "          a.binaries," >> turnin.spec
-          echo "          a.zipfiles," >> turnin.spec
-          echo "          a.datas," >> turnin.spec
-          echo "          []," >> turnin.spec
-          echo "          name='turnin'," >> turnin.spec
-          echo "          debug=False," >> turnin.spec
-          echo "          bootloader_ignore_signals=False," >> turnin.spec
-          echo "          strip=False," >> turnin.spec
-          echo "          upx=True," >> turnin.spec
-          echo "          upx_exclude=[]," >> turnin.spec
-          echo "          runtime_tmpdir=None," >> turnin.spec
-          echo "          console=False," >> turnin.spec
-          echo "          disable_windowed_traceback=False," >> turnin.spec
-          echo "          target_arch=None," >> turnin.spec
-          echo "          codesign_identity=None," >> turnin.spec
-          echo "          entitlements_file=None," >> turnin.spec
-          echo "          icon='cse.logo.ico')" >> turnin.spec
-
-          # Run PyInstaller with the spec file
-          pyinstaller turnin.spec
+          pyinstaller --name turnin --onefile --windowed --icon=cse.logo.ico --add-data "cse.logo.png;." --add-data "src;src" main_entry.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-packages
+          name: application-package-exe
           path: dist/turnin.exe
 
   build-debian-package:
@@ -109,17 +82,39 @@ jobs:
           EOF
           chmod +x turnin/DEBIAN/postinst
 
+          # Create main entry script
+          mkdir -p turnin/usr/share/turnin
+          cat > turnin/usr/share/turnin/main.py << EOF
+          import os
+          import sys
+
+          # Add the directory to path
+          base_dir = os.path.abspath(os.path.dirname(__file__))
+          sys.path.insert(0, base_dir)
+
+          # Import the main function
+          from src.turnin import main
+
+          if __name__ == "__main__":
+              main()
+          EOF
+
           # Create wrapper script for proper execution
           mkdir -p turnin/usr/bin
           cat > turnin/usr/bin/turnin << EOF
           #!/bin/bash
-          python3 /usr/share/turnin/turnin.py "\$@"
+          python3 /usr/share/turnin/main.py "\$@"
           EOF
           chmod +x turnin/usr/bin/turnin
 
-          # Create application directory and copy files
-          mkdir -p turnin/usr/share/turnin
-          cp -r src/* turnin/usr/share/turnin/
+          # Copy all source files
+          mkdir -p turnin/usr/share/turnin/src
+          cp -r src/* turnin/usr/share/turnin/src/
+          # Make sure we have __init__.py files for proper package imports
+          touch turnin/usr/share/turnin/src/__init__.py
+          find turnin/usr/share/turnin/src -type d -exec touch {}"/__init__.py" \;
+          
+          # Copy resources
           cp cse.logo.png turnin/usr/share/turnin/
 
           # Create desktop file
@@ -143,5 +138,5 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-packages
+          name: application-package-deb
           path: turnin.deb
