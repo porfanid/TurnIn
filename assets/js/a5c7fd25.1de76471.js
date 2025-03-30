@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkturn_in=self.webpackChunkturn_in||[]).push([[146],{9198:n=>{n.exports=JSON.parse('{"tags":[{"label":"turnin","permalink":"/TurnIn/blog/tags/turnin","count":1},{"label":"uoi","permalink":"/TurnIn/blog/tags/uoi","count":1},{"label":"university","permalink":"/TurnIn/blog/tags/university","count":1}]}')}}]);
