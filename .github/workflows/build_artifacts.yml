@@ -126,7 +126,7 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: turnin-${{ steps.version.outputs.version }}-windows
+          name: turnin-windows
           path: dist/turnin.exe
 
   build-debian-package:
@@ -226,7 +226,7 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: turnin-${{ env.VERSION }}-debian
+          name: turnin-debian
           path: turnin.deb
 
 
@@ -238,11 +238,9 @@ jobs:
       - name: Download all workflow artifacts
         uses: actions/download-artifact@v4
 
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=$(python3 -c "import sys; sys.path.append('src'); from version import VERSION; print(VERSION)")
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: List downloaded artifacts
         run: |
@@ -265,8 +263,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./turnin-${{ steps.get_version.outputs.VERSION }}-windows/turnin.exe
-          asset_name: turnin-${{ steps.get_version.outputs.VERSION }}-windows.exe
+          asset_path: ./turnin-windows/turnin.exe
+          asset_name: turnin.exe
           asset_content_type: application/octet-stream
 
       - name: Upload Debian Package
@@ -275,6 +273,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./turnin-${{ steps.get_version.outputs.VERSION }}-debian/turnin.deb
-          asset_name: turnin-${{ steps.get_version.outputs.VERSION }}-debian.deb
+          asset_path: ./turnin-debian/turnin.deb
+          asset_name: turnin.deb
           asset_content_type: application/vnd.debian.binary-package
