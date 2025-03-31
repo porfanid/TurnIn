@@ -3,7 +3,7 @@ name: Deploy Docusaurus Documentation
 on:
   push:
     branches:
-      - upgraded-to-app  # or your default branch
+      - master  # or your default branch
     paths:
       - 'docs/TurnIn/**'  # only trigger on changes to docs
 

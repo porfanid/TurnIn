@@ -3,7 +3,7 @@ name: Build Application Packages
 on:
   push:
     branches:
-      - upgraded-to-app
+      - master
     paths:
       - 'src/version.py'
 
