@@ -230,6 +230,10 @@ jobs:
     needs: [ build-windows-exe, build-debian-package ]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
       - name: Download all workflow artifacts
         uses: actions/download-artifact@v4
 
