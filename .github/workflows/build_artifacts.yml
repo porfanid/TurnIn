@@ -8,6 +8,8 @@ on:
       - 'src/**'  # Runs when files in src directory change
       - 'requirements.txt'  # Also runs when dependencies change
       - '.github/workflows/build_artifacts.yml'  # When the workflow itself changes
+    tags:
+      - 'version*'  # Run workflow on version tags
 
 jobs:
 
@@ -64,7 +66,8 @@ jobs:
           import sys
           sys.path.append(os.path.join(os.getcwd(), 'src'))
           from version import VERSION
-          print(f"::set-output name=version::{VERSION}")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f"version={VERSION}")
 
       - name: Install dependencies
         run: |
@@ -225,3 +228,48 @@ jobs:
         with:
           name: turnin-${{ env.VERSION }}-debian
           path: turnin.deb
+
+
+  create-release:
+    needs: [ build-windows-exe, build-debian-package ]
+    runs-on: ubuntu-latest
+    # Only run on tag pushes
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download all workflow artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Windows Executable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./turnin-*-windows/turnin-*.exe
+          asset_name: turnin-${{ steps.get_version.outputs.VERSION }}-windows.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Debian Package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./turnin-*-debian/turnin.deb
+          asset_name: turnin-${{ steps.get_version.outputs.VERSION }}-debian.deb
+          asset_content_type: application/vnd.debian.binary-package
