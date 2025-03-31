@@ -234,14 +234,19 @@ jobs:
     needs: [ build-windows-exe, build-debian-package ]
     runs-on: ubuntu-latest
     # Only run on tag pushes
-    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download all workflow artifacts
         uses: actions/download-artifact@v4
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import sys; sys.path.append('src'); from version import VERSION; print(VERSION)")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: List downloaded artifacts
+        run: |
+          find . -type f -name "*.exe" -o -name "*.deb"
 
       - name: Create Release
         id: create_release
@@ -252,7 +257,7 @@ jobs:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ steps.get_version.outputs.VERSION }}
           draft: false
-          prerelease: false
+          prerelease: true
 
       - name: Upload Windows Executable
         uses: actions/upload-release-asset@v1
@@ -260,7 +265,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./turnin-*-windows/turnin-*.exe
+          asset_path: ./turnin-${{ steps.get_version.outputs.VERSION }}-windows/turnin.exe
           asset_name: turnin-${{ steps.get_version.outputs.VERSION }}-windows.exe
           asset_content_type: application/octet-stream
 
@@ -270,6 +275,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./turnin-*-debian/turnin.deb
+          asset_path: ./turnin-${{ steps.get_version.outputs.VERSION }}-debian/turnin.deb
           asset_name: turnin-${{ steps.get_version.outputs.VERSION }}-debian.deb
           asset_content_type: application/vnd.debian.binary-package
