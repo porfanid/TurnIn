@@ -4,9 +4,42 @@ on:
   push:
     branches:
       - upgraded-to-app
+    paths:
+      - 'src/**'  # Runs when files in src directory change
+      - 'requirements.txt'  # Also runs when dependencies change
+      - '.github/workflows/build_artifacts.yml'  # When the workflow itself changes
 
 jobs:
+
+  run-tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Set up Qt environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0
+
+      - name: Run tests
+        run: |
+          python -m pytest src/tests/
+
   build-windows-exe:
+    needs: run-tests
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -16,6 +49,16 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.8
+
+      - name: Extract version
+        id: version
+        shell: python
+        run: |
+          import os
+          import sys
+          sys.path.append(os.path.join(os.getcwd(), 'src'))
+          from version import VERSION
+          print(f"::set-output name=version::{VERSION}")
 
       - name: Install dependencies
         run: |
@@ -74,10 +117,11 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-packages-exe
+          name: turnin-${{ steps.version.outputs.version }}-windows
           path: dist/turnin.exe
 
   build-debian-package:
+    needs: run-tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -87,6 +131,12 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.8
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import sys; sys.path.append('src'); from version import VERSION; print(VERSION)")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Fix imports in Python files
         run: |
@@ -104,7 +154,7 @@ jobs:
           # Create control file
           cat > turnin/DEBIAN/control << EOF
           Package: turnin
-          Version: 3.3
+          Version: ${{ env.VERSION }}
           Architecture: all
           Maintainer: Pavlos Orfanidis <pavlos@orfanidis.net.gr>
           Description: TurnIn App for submitting assignments
@@ -167,5 +217,5 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-packages-deb
+          name: turnin-${{ env.VERSION }}-debian
           path: turnin.deb

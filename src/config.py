@@ -1,8 +1,8 @@
 # Configuration for the TurnIn application
-
+from version import VERSION
 # App Information
 APP_NAME = "TurnIn"
-APP_VERSION = "3.3"
+APP_VERSION = VERSION
 REPO_OWNER = "porfanid"
 REPO_NAME = "TurnIn"
 

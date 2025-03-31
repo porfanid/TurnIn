@@ -5,7 +5,7 @@ on:
     branches:
       - upgraded-to-app  # or your default branch
     paths:
-      - 'edit-documentation/TurnIn/**'  # only trigger on changes to docs
+      - 'docs/TurnIn/**'  # only trigger on changes to docs
 
 jobs:
   deploy:

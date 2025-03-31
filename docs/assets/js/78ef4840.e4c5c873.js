@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkturn_in=self.webpackChunkturn_in||[]).push([[385],{5572:n=>{n.exports=JSON.parse('{"label":"university","permalink":"/TurnIn/blog/tags/university","allTagsPath":"/TurnIn/blog/tags","count":1}')}}]);
