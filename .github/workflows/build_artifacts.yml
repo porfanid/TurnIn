@@ -2,12 +2,6 @@ name: Build Application Packages
 
 on:
   push:
-    branches:
-      - upgraded-to-app
-    paths:
-      - 'src/**'  # Runs when files in src directory change
-      - 'requirements.txt'  # Also runs when dependencies change
-      - '.github/workflows/build_artifacts.yml'  # When the workflow itself changes
     tags:
       - 'version*'  # Run workflow on version tags
 
@@ -47,7 +41,6 @@ jobs:
           python -m unittest discover -s src/tests
 
   build-windows-exe:
-    if: startsWith(github.ref, 'refs/tags/')
     needs: run-tests
     runs-on: windows-latest
     steps:
@@ -131,7 +124,6 @@ jobs:
           path: dist/turnin.exe
 
   build-debian-package:
-    if: startsWith(github.ref, 'refs/tags/')
     needs: run-tests
     runs-on: ubuntu-latest
     steps:
@@ -235,8 +227,6 @@ jobs:
   create-release:
     needs: [ build-windows-exe, build-debian-package ]
     runs-on: ubuntu-latest
-    # Only run on tag pushes
-    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download all workflow artifacts
         uses: actions/download-artifact@v4
