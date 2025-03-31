@@ -237,12 +237,12 @@ jobs:
         id: get_version
         run: |
           VERSION=$(python3 -c "import sys; sys.path.append('src'); from version import VERSION; print(VERSION)")
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
           
       - name: Check if tag already exists
         id: check_tag
         run: |
-          if git ls-remote --tags origin | grep -q "refs/tags/version${{ steps.extract_version.outputs.VERSION }}"; then
+          if git ls-remote --tags origin | grep -q "refs/tags/version${{ env.VERSION }}"; then
             echo "TAG_EXISTS=true" >> $GITHUB_OUTPUT
           else
             echo "TAG_EXISTS=false" >> $GITHUB_OUTPUT
@@ -253,8 +253,8 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git tag -a "version${{ steps.extract_version.outputs.VERSION }}" -m "Release version ${{ steps.extract_version.outputs.VERSION }}"
-          git push origin "version${{ steps.extract_version.outputs.VERSION }}"
+          git tag -a "version${{ env.VERSION }}" -m "Release version ${{ env.VERSION }}"
+          git push origin "version${{ env.VERSION }}"
 
       - name: List downloaded artifacts
         run: |
@@ -266,8 +266,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: version${{ steps.get_version.outputs.VERSION }}
-          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          tag_name: version${{ env.VERSION }}
+          release_name: Release ${{ env.VERSION }}
           draft: false
           prerelease: false
 
