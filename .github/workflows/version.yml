@@ -17,6 +17,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Use PAT instead of GITHUB_TOKEN
+          token: ${{ secrets.PAT_TOKEN }}
 
       - name: Extract version
         id: extract_version
