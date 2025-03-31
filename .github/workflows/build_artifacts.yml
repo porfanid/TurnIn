@@ -31,7 +31,14 @@ jobs:
       - name: Set up Qt environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0
+          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0 libegl1 libopengl0
+
+      - name: Set up X Virtual Frame Buffer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxcb-xinerama0 libxcb-cursor0 libegl1 libopengl0
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
 
       - name: Run tests
         run: |
