@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkturn_in=self.webpackChunkturn_in||[]).push([[582],{8874:e=>{e.exports=JSON.parse('{"permalink":"/TurnIn/blog/tags/uoi","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Blog","blogTitle":"Blog"}')}}]);
