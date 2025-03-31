@@ -1,13 +1,41 @@
 # TurnIn
 
-[![Build Windows EXE](https://github.com/porfanid/TurnIn/actions/workflows/create_exe.yml/badge.svg)](https://github.com/porfanid/TurnIn/actions/workflows/create_exe.yml)
-[![Create Debian Package](https://github.com/porfanid/TurnIn/actions/workflows/create_deb.yml/badge.svg)](https://github.com/porfanid/TurnIn/actions/workflows/create_deb.yml)
+## Overview
+TurnIn is a tool designed for the turn-in system at the [University of Ioannina](https://www.uoi.gr/). It automates assignment submissions while maintaining a straightforward process.
 
-> Please add a star to the repository if you find it useful.
+## Features
+- Automated file submission
+- Compatible with Python, JavaScript, and Rust projects
+- Provides build artifacts for multiple platforms
 
-This is a program designed to be used with the turn in system at the [University of Ioannina](https://www.uoi.gr/).
+## Installation
+1. Clone the repository:
+   \```
+   git clone https://github.com/porfanid/TurnIn.git
+   \```
+2. Navigate into the repository directory and set up any required dependencies:
+   \```
+   cd TurnIn
+   pip install -r requirements.txt
+   \```
 
-In order to use or contribute to the app, you will have to read the documentation available [here](https://porfanid.github.io/TurnIn).
+## Usage
+- Run the command:
+   \```
+   python turnin.py
+   \```
+- Follow any prompts to finalize your submission.
 
-### Buy me a cup of coffee
-[![ko-fi](https://storage.ko-fi.com/cdn/useruploads/E1E5NA567/qrcode.png?v=fb4265e3-651d-4cb9-9866-bc72e53e7ee0?v=2)](https://ko-fi.com/porfanid)
+## Documentation
+Documentation and examples are available at [porfanid.github.io/TurnIn](https://porfanid.github.io/TurnIn).
+
+## Contributing
+1. Fork the repository and create a new branch.
+2. Make your changes and submit a pull request.
+3. Ensure your code meets the project\`s style guidelines.
+
+## License
+Licensed under the [MIT License](LICENSE).
+
+## Support
+If you find this project useful, consider giving it a star or buying a coffee at [Ko-fi](https://ko-fi.com/porfanid).
