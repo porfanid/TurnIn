@@ -364,18 +364,16 @@ def connect_to_proxy(username, password, proxy_host):
         return False, None, None
 
 def upload_files(files, username, password, ssh, host, temp_dir, progress_callback=None):
-    """Upload files with progress reporting"""
+    """Upload files with progress reporting using existing SSH connection"""
     if not files:
         return None, None
 
-    # Get home directory
+    # Get home directory using existing SSH connection
     _, ssh_stdout, _ = ssh.exec_command("pwd")
     home_dir = ssh_stdout.readlines()[0].strip()
 
-    # Setup SFTP connection
-    transport = paramiko.Transport((host, 22))
-    transport.connect(None, username, password)
-    sftp = paramiko.SFTPClient.from_transport(transport)
+    # Use existing SSH connection to create SFTP channel (avoids multiple connections)
+    sftp = ssh.open_sftp()
 
     remote_dir = f"{home_dir}/{temp_dir}/"
 
@@ -420,6 +418,12 @@ def upload_files(files, username, password, ssh, host, temp_dir, progress_callba
                     pass
         except Exception as e:
             print(f"Upload error: {str(e)}")
+
+    # Close SFTP connection
+    try:
+        sftp.close()
+    except:
+        pass
 
     return remote_dir, remote_paths
 

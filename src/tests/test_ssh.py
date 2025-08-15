@@ -228,10 +228,8 @@ class TestSSHUtils(unittest.TestCase):
         self.assertIsNone(host)
         self.assertIsNone(ssh)
 
-    @patch('src.utils.ssh.paramiko.Transport')
-    @patch('src.utils.ssh.paramiko.SFTPClient')
-    def test_upload_files(self, mock_sftp_client, mock_transport):
-        """Test uploading files to remote server"""
+    def test_upload_files(self):
+        """Test uploading files to remote server using existing SSH connection"""
         # Create mocks
         mock_ssh = MagicMock()
         mock_stdout = MagicMock()
@@ -239,7 +237,7 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.exec_command.return_value = (None, mock_stdout, None)
 
         mock_sftp = MagicMock()
-        mock_sftp_client.from_transport.return_value = mock_sftp
+        mock_ssh.open_sftp.return_value = mock_sftp
 
         # Create test files
         test_files = [
@@ -259,10 +257,8 @@ class TestSSHUtils(unittest.TestCase):
         self.assertEqual(remote_dir, "/home/user/tempdir/")
         self.assertEqual(remote_paths, ["file1.txt", "file2.py"])
 
-        # Verify SFTP usage
-        mock_transport.assert_called_once_with(("host", 22))
-        mock_transport.return_value.connect.assert_called_once_with(None, "user", "pass")
-        mock_sftp_client.from_transport.assert_called_once()
+        # Verify SFTP usage - should use existing SSH connection
+        mock_ssh.open_sftp.assert_called_once()
 
         # Verify mkdir called
         mock_sftp.mkdir.assert_called_once_with("/home/user/tempdir/")
@@ -273,6 +269,9 @@ class TestSSHUtils(unittest.TestCase):
             call("/path/to/file1.txt", "/home/user/tempdir/file1.txt"),
             call("/path/to/file2.py", "/home/user/tempdir/file2.py")
         ])
+
+        # Verify SFTP cleanup
+        mock_sftp.close.assert_called_once()
 
         # Verify progress callback
         self.assertTrue(mock_callback.call_count >= 3)  # At least start, middle, end
