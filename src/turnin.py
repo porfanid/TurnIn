@@ -31,9 +31,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-from ui.login_window import LoginWindow
-from utils.version_check import check_version
-from config import APP_NAME, APP_VERSION, SENTRY_DSN
+from .ui.login_window import LoginWindow
+from .utils.version_check import check_version
+from .config import APP_NAME, APP_VERSION, SENTRY_DSN
 
 
 def initialize_sentry():
