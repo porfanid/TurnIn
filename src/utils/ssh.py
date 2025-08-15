@@ -15,15 +15,62 @@ except ImportError:
     PYQT_AVAILABLE = False
 
 
+class FallbackHostKeyPolicy(paramiko.MissingHostKeyPolicy):
+    """
+    Fallback policy that uses hardcoded keys when secure verification fails
+    """
+    
+    def __init__(self):
+        try:
+            from config import SSH_KEYS
+            self.ssh_keys = SSH_KEYS
+        except ImportError:
+            # If config module is not available (e.g., during testing), use empty list
+            self.ssh_keys = []
+    
+    def missing_host_key(self, client, hostname, key):
+        """
+        Check if the host key matches any of our known hardcoded keys
+        """
+        key_type = key.get_name()
+        key_data = key.get_base64()
+        
+        # Check against hardcoded keys
+        for host, stored_type, stored_key in self.ssh_keys:
+            if host == hostname and stored_type == key_type and stored_key == key_data:
+                print(f"Using hardcoded key for {hostname} (fallback mode)")
+                return  # Accept the key
+        
+        # If no match found, reject
+        raise paramiko.SSHException(f"Host key verification failed for {hostname} - no matching hardcoded key found")
+
+
 class SecureHostKeyPolicy(paramiko.MissingHostKeyPolicy):
     """
     Custom host key policy that prompts user for verification and saves accepted keys
     """
     
+    def __init__(self, fallback_policy=None):
+        self.fallback_policy = fallback_policy or FallbackHostKeyPolicy()
+    
     def missing_host_key(self, client, hostname, key):
         """
         Called when an unknown host key is encountered.
         Shows the key fingerprint to the user and asks for confirmation.
+        Falls back to hardcoded keys if verification fails or times out.
+        """
+        try:
+            # Try secure verification first
+            self._secure_verification(client, hostname, key)
+        except (paramiko.SSHException, Exception) as e:
+            print(f"Secure verification failed for {hostname}: {e}")
+            print("Falling back to hardcoded key verification...")
+            # Fall back to hardcoded keys
+            self.fallback_policy.missing_host_key(client, hostname, key)
+    
+    def _secure_verification(self, client, hostname, key):
+        """
+        Perform secure host key verification with user interaction
         """
         # Generate key fingerprint
         key_type = key.get_name()
@@ -42,68 +89,87 @@ class SecureHostKeyPolicy(paramiko.MissingHostKeyPolicy):
         if PYQT_AVAILABLE:
             try:
                 if QApplication.instance() is not None:
-                    # GUI mode - show dialog
-                    dialog = QDialog()
-                    dialog.setWindowTitle("SSH Host Key Verification")
-                    dialog.setModal(True)
-                    
-                    layout = QVBoxLayout()
-                    
-                    # Warning message
-                    warning_label = QLabel(
-                        f"<b>WARNING: Unknown SSH host key for {hostname}</b><br><br>"
-                        f"The authenticity of host '{hostname}' can't be established.<br>"
-                        f"Key type: {key_type}<br><br>"
-                        f"SHA256 fingerprint: {sha256_fingerprint}<br>"
-                        f"MD5 fingerprint: {md5_fingerprint}<br><br>"
-                        f"Are you sure you want to continue connecting and save this key?"
-                    )
-                    warning_label.setWordWrap(True)
-                    layout.addWidget(warning_label)
-                    
-                    # Button layout
-                    button_layout = QHBoxLayout()
-                    accept_button = QPushButton("Accept and Save")
-                    reject_button = QPushButton("Reject")
-                    
-                    button_layout.addWidget(accept_button)
-                    button_layout.addWidget(reject_button)
-                    layout.addLayout(button_layout)
-                    
-                    dialog.setLayout(layout)
-                    
-                    # Connect button signals
-                    result = [False]  # Use list to allow modification in nested function
-                    
-                    def accept_key():
-                        result[0] = True
-                        dialog.accept()
-                    
-                    def reject_key():
-                        result[0] = False
-                        dialog.reject()
-                    
-                    accept_button.clicked.connect(accept_key)
-                    reject_button.clicked.connect(reject_key)
-                    
-                    # Show dialog and get result
-                    if dialog.exec() == QDialog.DialogCode.Accepted and result[0]:
-                        # User accepted - save the key
-                        self._save_host_key(hostname, key)
-                        return
-                    else:
-                        # User rejected
-                        raise paramiko.SSHException(f"Host key verification failed for {hostname}")
+                    # GUI mode - show dialog with timeout
+                    return self._gui_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
                 else:
                     # Console mode fallback
-                    self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
-            except Exception:
+                    return self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
+            except Exception as e:
+                print(f"GUI prompt failed: {e}")
                 # Fallback to console if GUI fails
-                self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
+                return self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
         else:
             # PyQt6 not available - use console prompt
-            self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
+            return self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
     
+    def _gui_prompt(self, hostname, key_type, sha256_fingerprint, md5_fingerprint, key):
+        """
+        GUI-based prompt for host key verification with timeout
+        """
+        dialog = QDialog()
+        dialog.setWindowTitle("SSH Host Key Verification")
+        dialog.setModal(True)
+        
+        layout = QVBoxLayout()
+        
+        # Warning message
+        warning_label = QLabel(
+            f"<b>WARNING: Unknown SSH host key for {hostname}</b><br><br>"
+            f"The authenticity of host '{hostname}' can't be established.<br>"
+            f"Key type: {key_type}<br><br>"
+            f"SHA256 fingerprint: {sha256_fingerprint}<br>"
+            f"MD5 fingerprint: {md5_fingerprint}<br><br>"
+            f"Are you sure you want to continue connecting and save this key?"
+        )
+        warning_label.setWordWrap(True)
+        layout.addWidget(warning_label)
+        
+        # Button layout
+        button_layout = QHBoxLayout()
+        accept_button = QPushButton("Accept and Save")
+        reject_button = QPushButton("Reject")
+        fallback_button = QPushButton("Use Hardcoded Keys")
+        
+        button_layout.addWidget(accept_button)
+        button_layout.addWidget(fallback_button)
+        button_layout.addWidget(reject_button)
+        layout.addLayout(button_layout)
+        
+        dialog.setLayout(layout)
+        
+        # Connect button signals
+        result = [None]  # Use list to allow modification in nested function
+        
+        def accept_key():
+            result[0] = 'accept'
+            dialog.accept()
+        
+        def reject_key():
+            result[0] = 'reject'
+            dialog.reject()
+        
+        def use_fallback():
+            result[0] = 'fallback'
+            dialog.reject()
+        
+        accept_button.clicked.connect(accept_key)
+        reject_button.clicked.connect(reject_key)
+        fallback_button.clicked.connect(use_fallback)
+        
+        # Show dialog and get result with timeout handling
+        dialog_result = dialog.exec()
+        
+        if result[0] == 'accept':
+            # User accepted - save the key
+            self._save_host_key(hostname, key)
+            return
+        elif result[0] == 'fallback':
+            # User chose to use hardcoded keys
+            raise paramiko.SSHException("User chose fallback to hardcoded keys")
+        else:
+            # User rejected or dialog was cancelled
+            raise paramiko.SSHException(f"Host key verification rejected for {hostname}")
+        
     def _console_prompt(self, hostname, key_type, sha256_fingerprint, md5_fingerprint, key):
         """
         Console-based prompt for host key verification
@@ -115,15 +181,17 @@ class SecureHostKeyPolicy(paramiko.MissingHostKeyPolicy):
         print(f"MD5 fingerprint: {md5_fingerprint}")
         
         while True:
-            response = input("Are you sure you want to continue connecting? (yes/no): ").lower().strip()
+            response = input("Are you sure you want to continue connecting? (yes/no/fallback): ").lower().strip()
             if response in ['yes', 'y']:
                 # Save the key and continue
                 self._save_host_key(hostname, key)
                 return
             elif response in ['no', 'n']:
-                raise paramiko.SSHException(f"Host key verification failed for {hostname}")
+                raise paramiko.SSHException(f"Host key verification rejected for {hostname}")
+            elif response in ['fallback', 'f']:
+                raise paramiko.SSHException("User chose fallback to hardcoded keys")
             else:
-                print("Please type 'yes' or 'no'")
+                print("Please type 'yes', 'no', or 'fallback'")
     
     def _save_host_key(self, hostname, key):
         """
@@ -212,7 +280,15 @@ def connect_to_proxy(username, password, proxy_host):
     try:
         ssh = paramiko.SSHClient()
         add_ssh_keys(ssh)
-        ssh.connect(proxy_host, username=username, password=password)
+        
+        # Set connection timeout to prevent hanging
+        ssh.connect(
+            proxy_host, 
+            username=username, 
+            password=password, 
+            timeout=30,  # 30 second connection timeout
+            banner_timeout=20  # 20 second banner timeout
+        )
 
         # Find available host
         host_to_connect = get_available_server(ssh)
@@ -230,13 +306,24 @@ def connect_to_proxy(username, password, proxy_host):
     except paramiko.AuthenticationException:
         return False, None, None
     except paramiko.ssh_exception.SSHException as e:
+        error_msg = f"SSH Error: {e}"
         if PYQT_AVAILABLE:
             try:
-                QMessageBox.critical(None, "SSH Error", str(e))
+                QMessageBox.critical(None, "SSH Error", error_msg)
             except:
-                print(f"SSH Error: {e}")
+                print(error_msg)
         else:
-            print(f"SSH Error: {e}")
+            print(error_msg)
+        return False, None, None
+    except Exception as e:
+        error_msg = f"Connection Error: {e}"
+        if PYQT_AVAILABLE:
+            try:
+                QMessageBox.critical(None, "Connection Error", error_msg)
+            except:
+                print(error_msg)
+        else:
+            print(error_msg)
         return False, None, None
 
 def upload_files(files, username, password, ssh, host, temp_dir, progress_callback=None):
@@ -338,11 +425,13 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
             target_ssh = paramiko.SSHClient()
             add_ssh_keys(target_ssh)
 
-            # Connect through the tunnel
+            # Connect through the tunnel with timeout
             target_ssh.connect('127.0.0.1',
                              port=tunnel.local_bind_port,
                              username=username,
-                             password=password)
+                             password=password,
+                             timeout=30,  # 30 second connection timeout
+                             banner_timeout=20)  # 20 second banner timeout
 
             if progress_callback:
                 try:

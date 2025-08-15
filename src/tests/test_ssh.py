@@ -189,7 +189,7 @@ class TestSSHUtils(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(host, "dl-server")
         self.assertEqual(ssh, mock_ssh)
-        mock_ssh.connect.assert_called_once_with("proxy.host", username="user", password="pass")
+        mock_ssh.connect.assert_called_once_with("proxy.host", username="user", password="pass", timeout=30, banner_timeout=20)
 
     @patch('src.utils.ssh.paramiko.SSHClient')
     @patch('src.utils.ssh.PYQT_AVAILABLE', False)
