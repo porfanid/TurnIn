@@ -194,11 +194,12 @@ class TestSSHUtils(unittest.TestCase):
         # Verify progress callback
         self.assertTrue(mock_callback.call_count >= 3)  # At least start, middle, end
 
-    @patch('src.utils.ssh.sshtunnel.SSHTunnelForwarder')
-    @patch('src.utils.ssh.connect_to_proxy')
-    @patch('src.utils.ssh.upload_files')
-    def test_submit_files_stdin_interaction(self, mock_upload_files, mock_connect_to_proxy, mock_tunnel):
-        """Test that submit_files properly handles stdin interaction instead of using 'yes | turnin'"""
+    @patch('utils.ssh.select.select')
+    @patch('utils.ssh.SSHTunnelForwarder')
+    @patch('utils.ssh.connect_to_proxy')
+    @patch('utils.ssh.upload_files')
+    def test_submit_files_interactive_execution(self, mock_upload_files, mock_connect_to_proxy, mock_tunnel, mock_select):
+        """Test that submit_files properly handles interactive execution without automatic responses"""
         # Setup mocks
         mock_ssh = MagicMock()
         mock_connect_to_proxy.return_value = (True, "test_host", mock_ssh)
@@ -216,34 +217,45 @@ class TestSSHUtils(unittest.TestCase):
         mock_stdout = MagicMock()
         mock_stderr = MagicMock()
         
+        # Mock the channel for non-blocking mode
+        mock_channel = MagicMock()
+        mock_stdout.channel = mock_channel
+        mock_stderr.channel = mock_channel
+        mock_channel.setblocking = MagicMock()
+        mock_channel.exit_status_ready.return_value = True
+        
         mock_stdout.read.return_value = b"turnin output"
         mock_stderr.read.return_value = b""
         
-        with patch('src.utils.ssh.paramiko.SSHClient', return_value=mock_target_ssh):
+        # Mock select to return no ready channels (command finishes immediately)
+        mock_select.return_value = ([], [], [])
+        
+        # Mock interactive callback
+        mock_interactive_callback = MagicMock()
+        mock_interactive_callback.return_value = None
+        
+        with patch('utils.ssh.paramiko.SSHClient', return_value=mock_target_ssh):
             mock_target_ssh.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
             
-            # Call the function
+            # Call the function with interactive callback
             success, output = submit_files(
                 "proxy.host", "target.host", "user", "pass", "assignment1",
-                ["/path/to/file1.txt", "/path/to/file2.py"], "tempdir"
+                ["/path/to/file1.txt", "/path/to/file2.py"], "tempdir",
+                interactive_callback=mock_interactive_callback
             )
             
             # Verify success
             self.assertTrue(success)
-            self.assertEqual(output, "turnin output")
+            self.assertIn("turnin output", output)
             
-            # Verify the turnin command was called correctly
+            # Verify the turnin command was called WITHOUT "yes|" prefix
             expected_cmd = "cd /home/user/tempdir/ && turnin assignment1 file1.txt file2.py"
-            mock_target_ssh.exec_command.assert_called_once_with(expected_cmd, timeout=30)
+            mock_target_ssh.exec_command.assert_called_once_with(expected_cmd, timeout=60)
             
-            # Verify stdin interaction (should write 'y\n' twice and close)
-            expected_calls = [
-                call('y\n'),
-                call('y\n')
-            ]
-            mock_stdin.write.assert_has_calls(expected_calls)
-            self.assertEqual(mock_stdin.write.call_count, 2)
-            mock_stdin.flush.assert_called()
+            # Verify interactive callback was called with output
+            mock_interactive_callback.assert_called()
+            
+            # Verify stdin is closed (no automatic responses sent initially)
             mock_stdin.close.assert_called_once()
 
 

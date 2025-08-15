@@ -407,8 +407,9 @@ def upload_files(files, username, password, ssh, host, temp_dir, progress_callba
 
 
 def submit_files(proxy_host, host_to_connect, username, password, assignment,
-                 file_list, temp_dir, ssh_client=None, progress_callback=None):
-    """Submit files to the assignment submission server"""
+                 file_list, temp_dir, ssh_client=None, progress_callback=None,
+                 interactive_callback=None):
+    """Submit files to the assignment submission server with interactive support"""
     # Use existing SSH client or create a new one
     if ssh_client:
         ssh = ssh_client
@@ -471,43 +472,24 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
                 except Exception:
                     pass
 
-            # Build and execute the turnin command
-            cmd = f"cd {remote_dir} && yes|turnin {assignment} {' '.join(remote_paths)}"
-            print(cmd)
-            stdin, stdout, stderr = target_ssh.exec_command(cmd, timeout=30)
+            # Build and execute the turnin command WITHOUT automatic yes responses
+            cmd = f"cd {remote_dir} && turnin {assignment} {' '.join(remote_paths)}"
+            print(f"Executing command: {cmd}")
             
-            # Send responses to any prompts
-            # Use stdin/stdout interaction instead of "yes | turnin" for better reliability
-            try:
-                # Send "y" to confirm prompts (typically asking for confirmation)
-                stdin.write('y\n')
-                stdin.flush()
-                
-                # Give the command a moment to process the first response
-                import time
-                time.sleep(0.1)
-                
-                # Send second "y" for any additional prompts
-                stdin.write('y\n')
-                stdin.flush()
-                
-                # Close stdin to signal no more input
-                stdin.close()
-                
-            except Exception as e:
-                print(f"Warning: Error sending input to turnin command: {e}")
-
-            # Gather output
-            output_stdout = stdout.read().decode('utf-8', errors='replace')
-            output_stderr = stderr.read().decode('utf-8', errors='replace')
-            output = output_stdout + output_stderr
+            if interactive_callback:
+                interactive_callback("output", f"Executing: {cmd}\n")
+            
+            stdin, stdout, stderr = target_ssh.exec_command(cmd, timeout=60)
+            
+            # Handle interactive turnin execution
+            output = handle_interactive_execution(stdin, stdout, stderr, interactive_callback)
 
             # Close connection
             target_ssh.close()
 
         if progress_callback:
             try:
-                progress_callback(100, "Assignment submitted successfully!")
+                progress_callback(100, "Assignment submission completed!")
             except Exception as e:
                 return False, f"Error updating progress bar: {str(e)}"
 
@@ -521,3 +503,96 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
         return False, f"Network connection failed during submission: {str(e)}"
     except Exception as e:
         return False, f"Error executing turnin command: {str(e)}"
+
+
+def handle_interactive_execution(stdin, stdout, stderr, interactive_callback=None):
+    """Handle interactive turnin command execution"""
+    import time
+    import select
+    
+    full_output = ""
+    
+    try:
+        # Set non-blocking mode for stdout and stderr
+        stdout.channel.setblocking(0)
+        stderr.channel.setblocking(0)
+        
+        while True:
+            # Check if there's output to read
+            ready, _, _ = select.select([stdout.channel, stderr.channel], [], [], 1.0)
+            
+            if stdout.channel in ready:
+                try:
+                    chunk = stdout.read(1024)
+                    if chunk:
+                        text = chunk.decode('utf-8', errors='replace')
+                        full_output += text
+                        
+                        if interactive_callback:
+                            interactive_callback("output", text)
+                        
+                        # Check if this looks like a prompt
+                        lines = text.strip().split('\n')
+                        for line in lines:
+                            if line.strip() and (
+                                '?' in line or 
+                                '[' in line and ']' in line or
+                                'continue' in line.lower() or
+                                'proceed' in line.lower() or
+                                'confirm' in line.lower() or
+                                'submit' in line.lower()
+                            ):
+                                # This looks like a prompt, ask user for input
+                                if interactive_callback:
+                                    response = interactive_callback("prompt", line.strip())
+                                    if response:
+                                        stdin.write(f"{response}\n")
+                                        stdin.flush()
+                                        full_output += f"\n> {response}\n"
+                                        time.sleep(0.2)  # Brief pause after sending response
+                except:
+                    pass
+            
+            if stderr.channel in ready:
+                try:
+                    chunk = stderr.read(1024)
+                    if chunk:
+                        text = chunk.decode('utf-8', errors='replace')
+                        full_output += text
+                        if interactive_callback:
+                            interactive_callback("output", text)
+                except:
+                    pass
+            
+            # Check if the command has finished
+            if stdout.channel.exit_status_ready():
+                break
+                
+            # Prevent infinite loop
+            time.sleep(0.1)
+        
+        # Read any remaining output
+        try:
+            remaining_stdout = stdout.read().decode('utf-8', errors='replace')
+            remaining_stderr = stderr.read().decode('utf-8', errors='replace')
+            remaining = remaining_stdout + remaining_stderr
+            if remaining:
+                full_output += remaining
+                if interactive_callback:
+                    interactive_callback("output", remaining)
+        except:
+            pass
+            
+    except Exception as e:
+        error_msg = f"Error during interactive execution: {str(e)}"
+        full_output += f"\n{error_msg}"
+        if interactive_callback:
+            interactive_callback("output", error_msg)
+    finally:
+        # Close stdin
+        try:
+            stdin.close()
+        except:
+            pass
+    
+    return full_output
