@@ -172,6 +172,58 @@ class TestSSHUtils(unittest.TestCase):
         # Verify progress callback
         self.assertTrue(mock_callback.call_count >= 3)  # At least start, middle, end
 
+    @patch('src.utils.ssh.sshtunnel.SSHTunnelForwarder')
+    @patch('src.utils.ssh.connect_to_proxy')
+    @patch('src.utils.ssh.upload_files')
+    def test_submit_files_stdin_interaction(self, mock_upload_files, mock_connect_to_proxy, mock_tunnel):
+        """Test that submit_files properly handles stdin interaction instead of using 'yes | turnin'"""
+        # Setup mocks
+        mock_ssh = MagicMock()
+        mock_connect_to_proxy.return_value = (True, "test_host", mock_ssh)
+        
+        mock_upload_files.return_value = ("/home/user/tempdir/", ["file1.txt", "file2.py"])
+        
+        # Mock SSH tunnel
+        mock_tunnel_instance = MagicMock()
+        mock_tunnel_instance.local_bind_port = 12345
+        mock_tunnel.return_value.__enter__.return_value = mock_tunnel_instance
+        
+        # Mock target SSH client
+        mock_target_ssh = MagicMock()
+        mock_stdin = MagicMock()
+        mock_stdout = MagicMock()
+        mock_stderr = MagicMock()
+        
+        mock_stdout.read.return_value = b"turnin output"
+        mock_stderr.read.return_value = b""
+        
+        with patch('src.utils.ssh.paramiko.SSHClient', return_value=mock_target_ssh):
+            mock_target_ssh.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
+            
+            # Call the function
+            success, output = submit_files(
+                "proxy.host", "target.host", "user", "pass", "assignment1",
+                ["/path/to/file1.txt", "/path/to/file2.py"], "tempdir"
+            )
+            
+            # Verify success
+            self.assertTrue(success)
+            self.assertEqual(output, "turnin output")
+            
+            # Verify the turnin command was called correctly
+            expected_cmd = "cd /home/user/tempdir/ && turnin assignment1 file1.txt file2.py"
+            mock_target_ssh.exec_command.assert_called_once_with(expected_cmd, timeout=30)
+            
+            # Verify stdin interaction (should write 'y\n' twice and close)
+            expected_calls = [
+                call('y\n'),
+                call('y\n')
+            ]
+            mock_stdin.write.assert_has_calls(expected_calls)
+            self.assertEqual(mock_stdin.write.call_count, 2)
+            mock_stdin.flush.assert_called()
+            mock_stdin.close.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()

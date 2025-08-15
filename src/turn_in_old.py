@@ -274,8 +274,29 @@ def run_command_to_turn_in(host, username, password, host_to_connect, remote_dir
             message.setIcon(QMessageBox.Critical)
             message.exec_()
             exit()
-        turn_in_command = f"cd {remote_dir}&&yes|turnin {assignment} {' '.join(remote_paths)}"
-        _, ssh_stdout, ssh_stderr = ssh.exec_command(turn_in_command)
+        # Use stdin/stdout interaction instead of "yes | turnin" for better reliability
+        turn_in_command = f"cd {remote_dir} && turnin {assignment} {' '.join(remote_paths)}"
+        ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(turn_in_command)
+        
+        # Send responses to any prompts using stdin
+        try:
+            # Send "y" to confirm prompts (typically asking for confirmation)
+            ssh_stdin.write('y\n')
+            ssh_stdin.flush()
+            
+            # Give the command a moment to process the first response
+            import time
+            time.sleep(0.1)
+            
+            # Send second "y" for any additional prompts
+            ssh_stdin.write('y\n')
+            ssh_stdin.flush()
+            
+            # Close stdin to signal no more input
+            ssh_stdin.close()
+            
+        except Exception as e:
+            print(f"Warning: Error sending input to turnin command: {e}")
         ssh.exec_command(f"rm -R {remote_dir}")
         msg = QMessageBox()
         msg.setText(f"{''.join(ssh_stdout.readlines())}\n\n{''.join(ssh_stderr.readlines())}")

@@ -181,12 +181,27 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
             cmd = f"cd {remote_dir} && turnin {assignment} {' '.join(remote_paths)}"
             print(cmd)
             stdin, stdout, stderr = target_ssh.exec_command(cmd, timeout=30)
-            # Send "y" to the command to confirm any prompts
-            stdin.write('y\n')
-            stdin.flush()
-            stdin.write('y\n')
-            stdin.flush()
-
+            
+            # Send responses to any prompts
+            # Use stdin/stdout interaction instead of "yes | turnin" for better reliability
+            try:
+                # Send "y" to confirm prompts (typically asking for confirmation)
+                stdin.write('y\n')
+                stdin.flush()
+                
+                # Give the command a moment to process the first response
+                import time
+                time.sleep(0.1)
+                
+                # Send second "y" for any additional prompts
+                stdin.write('y\n')
+                stdin.flush()
+                
+                # Close stdin to signal no more input
+                stdin.close()
+                
+            except Exception as e:
+                print(f"Warning: Error sending input to turnin command: {e}")
 
             # Gather output
             output_stdout = stdout.read().decode('utf-8', errors='replace')
