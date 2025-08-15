@@ -4,14 +4,160 @@ SSH utilities for handling connections and file transfers
 import os
 import socket
 import paramiko
-import sshtunnel
+import threading
+import select
 
-# Try to import PyQt6 widgets, but handle gracefully if not available
 try:
     from PyQt6.QtWidgets import QMessageBox
     PYQT_AVAILABLE = True
 except ImportError:
     PYQT_AVAILABLE = False
+
+
+class SSHTunnelForwarder:
+    """Simple SSH tunnel forwarder using paramiko without DSSKey dependencies"""
+    
+    def __init__(self, ssh_host, ssh_port, ssh_username, ssh_password, 
+                 remote_bind_address, local_bind_address=('127.0.0.1', 0)):
+        self.ssh_host = ssh_host
+        self.ssh_port = ssh_port
+        self.ssh_username = ssh_username
+        self.ssh_password = ssh_password
+        self.remote_bind_address = remote_bind_address
+        self.local_bind_address = local_bind_address
+        
+        self._ssh_client = None
+        self._local_socket = None
+        self.local_bind_port = None
+        self._tunnel_thread = None
+        self._stop_tunnel = False
+    
+    def __enter__(self):
+        self.start()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+    
+    def start(self):
+        """Start the SSH tunnel"""
+        # Create SSH connection
+        self._ssh_client = paramiko.SSHClient()
+        add_ssh_keys(self._ssh_client)
+        self._ssh_client.connect(
+            self.ssh_host,
+            port=self.ssh_port,
+            username=self.ssh_username,
+            password=self.ssh_password,
+            timeout=15,
+            banner_timeout=10
+        )
+        
+        # Create local socket
+        self._local_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._local_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._local_socket.bind(self.local_bind_address)
+        self.local_bind_port = self._local_socket.getsockname()[1]
+        self._local_socket.listen(1)
+        
+        # Start tunnel thread
+        self._stop_tunnel = False
+        self._tunnel_thread = threading.Thread(target=self._tunnel_handler)
+        self._tunnel_thread.daemon = True
+        self._tunnel_thread.start()
+    
+    def stop(self):
+        """Stop the SSH tunnel"""
+        self._stop_tunnel = True
+        
+        if self._local_socket:
+            try:
+                self._local_socket.close()
+            except:
+                pass
+        
+        if self._ssh_client:
+            try:
+                self._ssh_client.close()
+            except:
+                pass
+        
+        if self._tunnel_thread and self._tunnel_thread.is_alive():
+            self._tunnel_thread.join(timeout=1)
+    
+    def _tunnel_handler(self):
+        """Handle tunnel connections"""
+        try:
+            while not self._stop_tunnel:
+                try:
+                    # Set a timeout for accept to allow checking stop condition
+                    self._local_socket.settimeout(1.0)
+                    client_socket, addr = self._local_socket.accept()
+                    
+                    # Handle connection in separate thread
+                    connection_thread = threading.Thread(
+                        target=self._handle_connection, 
+                        args=(client_socket,)
+                    )
+                    connection_thread.daemon = True
+                    connection_thread.start()
+                    
+                except socket.timeout:
+                    continue
+                except Exception:
+                    break
+        except Exception:
+            pass
+    
+    def _handle_connection(self, client_socket):
+        """Handle a single tunnel connection"""
+        try:
+            # Create channel through SSH connection
+            channel = self._ssh_client.get_transport().open_channel(
+                'direct-tcpip',
+                self.remote_bind_address,
+                client_socket.getpeername()
+            )
+            
+            # Forward data between client and channel
+            self._forward_data(client_socket, channel)
+            
+        except Exception:
+            pass
+        finally:
+            try:
+                client_socket.close()
+            except:
+                pass
+    
+    def _forward_data(self, client_socket, channel):
+        """Forward data between client socket and SSH channel"""
+        try:
+            while True:
+                ready, _, _ = select.select([client_socket, channel], [], [], 1.0)
+                
+                if self._stop_tunnel:
+                    break
+                
+                if client_socket in ready:
+                    data = client_socket.recv(4096)
+                    if not data:
+                        break
+                    channel.send(data)
+                
+                if channel in ready:
+                    data = channel.recv(4096)
+                    if not data:
+                        break
+                    client_socket.send(data)
+        
+        except Exception:
+            pass
+        finally:
+            try:
+                channel.close()
+            except:
+                pass
 
 
 def add_ssh_keys(ssh):
@@ -233,8 +379,9 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
     # Run the turnin command through SSH tunnel
     try:
         # Create SSH tunnel to the target host through the proxy
-        with sshtunnel.SSHTunnelForwarder(
-            (proxy_host, 22),
+        with SSHTunnelForwarder(
+            ssh_host=proxy_host,
+            ssh_port=22,
             ssh_username=username,
             ssh_password=password,
             remote_bind_address=(host_to_connect, 22),
