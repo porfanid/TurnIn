@@ -130,13 +130,16 @@ class KnownHostKeyPolicy(paramiko.MissingHostKeyPolicy):
     Host key policy that verifies against known hosts and hardcoded keys
     """
     
-    def __init__(self):
+    def __init__(self, actual_hostname=None):
         try:
             from config import SSH_KEYS
             self.ssh_keys = SSH_KEYS
         except ImportError:
             # If config module is not available (e.g., during testing), use empty list
             self.ssh_keys = []
+        
+        # Store the actual hostname for tunneled connections
+        self.actual_hostname = actual_hostname
     
     def missing_host_key(self, client, hostname, key):
         """
@@ -145,38 +148,42 @@ class KnownHostKeyPolicy(paramiko.MissingHostKeyPolicy):
         key_type = key.get_name()
         key_data = key.get_base64()
         
+        # Use actual hostname for display and saving if this is a tunneled connection
+        display_hostname = self.actual_hostname if self.actual_hostname else hostname
+        save_hostname = self.actual_hostname if self.actual_hostname else hostname
+        
         # Check against hardcoded keys
         for host, stored_type, stored_key in self.ssh_keys:
-            if host == hostname and stored_type == key_type and stored_key == key_data:
-                print(f"Host key verified for {hostname} using known keys")
+            if host == display_hostname and stored_type == key_type and stored_key == key_data:
+                print(f"Host key verified for {display_hostname} using known keys")
                 return  # Accept the key
         
         # If no match found, ask user if PyQt6 is available
         if PYQT_AVAILABLE:
             try:
                 fingerprint = get_key_fingerprint(key)
-                dialog = HostKeyVerificationDialog(hostname, key_type, fingerprint)
+                dialog = HostKeyVerificationDialog(display_hostname, key_type, fingerprint)
                 result = dialog.exec()
                 
                 if result == QDialog.Accepted:
-                    # User accepted the key, save it to known_hosts
-                    if save_host_key_to_known_hosts(hostname, key):
-                        print(f"Host key accepted and saved for {hostname}")
+                    # User accepted the key, save it to known_hosts using the actual hostname
+                    if save_host_key_to_known_hosts(save_hostname, key):
+                        print(f"Host key accepted and saved for {save_hostname}")
                         return  # Accept the key
                     else:
-                        print(f"Warning: Host key accepted but could not be saved for {hostname}")
+                        print(f"Warning: Host key accepted but could not be saved for {save_hostname}")
                         return  # Accept anyway
                 else:
                     # User rejected the key
-                    raise paramiko.SSHException(f"Host key verification failed for {hostname} - user rejected unknown host key")
+                    raise paramiko.SSHException(f"Host key verification failed for {display_hostname} - user rejected unknown host key")
                     
             except Exception as e:
                 # If there's an error with the dialog, fall back to rejection
                 print(f"Error showing host key dialog: {e}")
-                raise paramiko.SSHException(f"Host key verification failed for {hostname} - unknown host key")
+                raise paramiko.SSHException(f"Host key verification failed for {display_hostname} - unknown host key")
         else:
             # If PyQt6 is not available, reject as before
-            raise paramiko.SSHException(f"Host key verification failed for {hostname} - unknown host key")
+            raise paramiko.SSHException(f"Host key verification failed for {display_hostname} - unknown host key")
 
 
 class SSHTunnelForwarder:
@@ -353,12 +360,13 @@ class SSHTunnelForwarder:
                 pass
 
 
-def add_ssh_keys(ssh):
+def add_ssh_keys(ssh, actual_hostname=None):
     """
     Configure SSH client with host key verification and password-only authentication
 
     Args:
         ssh (paramiko.SSHClient): The SSH client to configure
+        actual_hostname (str, optional): The actual hostname for tunneled connections
     """
     # Load system and user known_hosts files for host key verification
     try:
@@ -376,7 +384,7 @@ def add_ssh_keys(ssh):
         print(f"Warning: Could not load user host keys: {e}")
     
     # Set host key verification policy (falls back to hardcoded keys for known servers)
-    ssh.set_missing_host_key_policy(KnownHostKeyPolicy())
+    ssh.set_missing_host_key_policy(KnownHostKeyPolicy(actual_hostname))
 
 def get_available_server(ssh):
     """
@@ -658,7 +666,7 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
         ) as tunnel:
             # Create a new SSH client to connect to the tunneled host
             target_ssh = paramiko.SSHClient()
-            add_ssh_keys(target_ssh)
+            add_ssh_keys(target_ssh, host_to_connect)  # Pass actual hostname for proper key verification
 
             # Connect through the tunnel with timeout and fallback authentication
             try:
@@ -674,7 +682,7 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
                 # Try keyboard-interactive authentication as fallback
                 target_ssh.close()
                 target_ssh = paramiko.SSHClient()
-                add_ssh_keys(target_ssh)
+                add_ssh_keys(target_ssh, host_to_connect)  # Pass actual hostname for proper key verification
                 
                 # Connect without authentication first
                 transport = paramiko.Transport(('127.0.0.1', tunnel.local_bind_port))
