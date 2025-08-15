@@ -2,7 +2,7 @@
 Interactive dialog for handling turnin command execution with user prompts
 """
 import re
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QDialog, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QTextEdit, QLineEdit, QLabel, QGroupBox, QScrollArea)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
