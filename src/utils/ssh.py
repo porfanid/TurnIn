@@ -186,178 +186,7 @@ class KnownHostKeyPolicy(paramiko.MissingHostKeyPolicy):
             raise paramiko.SSHException(f"Host key verification failed for {display_hostname} - unknown host key")
 
 
-class SSHTunnelForwarder:
-    """Simple SSH tunnel forwarder using paramiko without DSSKey dependencies"""
-    
-    def __init__(self, ssh_host, ssh_port, ssh_username, ssh_password, 
-                 remote_bind_address, local_bind_address=('127.0.0.1', 0)):
-        self.ssh_host = ssh_host
-        self.ssh_port = ssh_port
-        self.ssh_username = ssh_username
-        self.ssh_password = ssh_password
-        self.remote_bind_address = remote_bind_address
-        self.local_bind_address = local_bind_address
-        
-        self._ssh_client = None
-        self._local_socket = None
-        self.local_bind_port = None
-        self._tunnel_thread = None
-        self._stop_tunnel = False
-    
-    def __enter__(self):
-        self.start()
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.stop()
-    
-    def start(self):
-        """Start the SSH tunnel"""
-        # Create SSH connection
-        self._ssh_client = paramiko.SSHClient()
-        add_ssh_keys(self._ssh_client)
-        
-        try:
-            # Try password authentication first
-            self._ssh_client.connect(
-                self.ssh_host,
-                port=self.ssh_port,
-                username=self.ssh_username,
-                password=self.ssh_password,
-                timeout=15,
-                banner_timeout=10,
-                allow_agent=False,  # Disable SSH agent key usage
-                look_for_keys=False  # Disable automatic private key discovery
-            )
-        except paramiko.AuthenticationException:
-            # Try keyboard-interactive authentication as fallback
-            try:
-                self._ssh_client.close()
-                self._ssh_client = paramiko.SSHClient()
-                add_ssh_keys(self._ssh_client)
-                
-                # Connect without authentication first
-                transport = paramiko.Transport((self.ssh_host, self.ssh_port))
-                transport.connect()
-                
-                # Try keyboard-interactive authentication
-                def auth_handler(title, instructions, prompt_list):
-                    # For keyboard-interactive, return the password for all prompts
-                    if prompt_list:
-                        return [self.ssh_password] * len(prompt_list)
-                    return []
-                
-                transport.auth_interactive(self.ssh_username, auth_handler)
-                self._ssh_client._transport = transport
-            except:
-                # If both methods fail, re-raise the original auth exception
-                raise paramiko.AuthenticationException("Authentication failed with both password and keyboard-interactive methods")
-        
-        # Create local socket
-        self._local_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._local_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._local_socket.bind(self.local_bind_address)
-        self.local_bind_port = self._local_socket.getsockname()[1]
-        self._local_socket.listen(1)
-        
-        # Start tunnel thread
-        self._stop_tunnel = False
-        self._tunnel_thread = threading.Thread(target=self._tunnel_handler)
-        self._tunnel_thread.daemon = True
-        self._tunnel_thread.start()
-    
-    def stop(self):
-        """Stop the SSH tunnel"""
-        self._stop_tunnel = True
-        
-        if self._local_socket:
-            try:
-                self._local_socket.close()
-            except:
-                pass
-        
-        if self._ssh_client:
-            try:
-                self._ssh_client.close()
-            except:
-                pass
-        
-        if self._tunnel_thread and self._tunnel_thread.is_alive():
-            self._tunnel_thread.join(timeout=1)
-    
-    def _tunnel_handler(self):
-        """Handle tunnel connections"""
-        try:
-            while not self._stop_tunnel:
-                try:
-                    # Set a timeout for accept to allow checking stop condition
-                    self._local_socket.settimeout(1.0)
-                    client_socket, addr = self._local_socket.accept()
-                    
-                    # Handle connection in separate thread
-                    connection_thread = threading.Thread(
-                        target=self._handle_connection, 
-                        args=(client_socket,)
-                    )
-                    connection_thread.daemon = True
-                    connection_thread.start()
-                    
-                except socket.timeout:
-                    continue
-                except Exception:
-                    break
-        except Exception:
-            pass
-    
-    def _handle_connection(self, client_socket):
-        """Handle a single tunnel connection"""
-        try:
-            # Create channel through SSH connection
-            channel = self._ssh_client.get_transport().open_channel(
-                'direct-tcpip',
-                self.remote_bind_address,
-                client_socket.getpeername()
-            )
-            
-            # Forward data between client and channel
-            self._forward_data(client_socket, channel)
-            
-        except Exception:
-            pass
-        finally:
-            try:
-                client_socket.close()
-            except:
-                pass
-    
-    def _forward_data(self, client_socket, channel):
-        """Forward data between client socket and SSH channel"""
-        try:
-            while True:
-                ready, _, _ = select.select([client_socket, channel], [], [], 1.0)
-                
-                if self._stop_tunnel:
-                    break
-                
-                if client_socket in ready:
-                    data = client_socket.recv(4096)
-                    if not data:
-                        break
-                    channel.send(data)
-                
-                if channel in ready:
-                    data = channel.recv(4096)
-                    if not data:
-                        break
-                    client_socket.send(data)
-        
-        except Exception:
-            pass
-        finally:
-            try:
-                channel.close()
-            except:
-                pass
+# SSHTunnelForwarder class removed - using direct channel forwarding instead
 
 
 def add_ssh_keys(ssh, actual_hostname=None):
@@ -562,7 +391,7 @@ def upload_files(files, username, password, ssh, host, temp_dir, progress_callba
     _, ssh_stdout, _ = ssh.exec_command("pwd")
     home_dir = ssh_stdout.readlines()[0].strip()
 
-    # Use existing SSH connection to create SFTP channel (avoids multiple connections)
+    # Use existing SSH connection to create SFTP channel (reuses the single connection)
     sftp = ssh.open_sftp()
 
     remote_dir = f"{home_dir}/{temp_dir}/"
@@ -621,7 +450,7 @@ def upload_files(files, username, password, ssh, host, temp_dir, progress_callba
 def submit_files(proxy_host, host_to_connect, username, password, assignment,
                  file_list, temp_dir, ssh_client=None, progress_callback=None,
                  interactive_callback=None):
-    """Submit files to the assignment submission server with interactive support"""
+    """Submit files to the assignment submission server using minimal SSH connections"""
     # Use existing SSH client or create a new one
     if ssh_client:
         ssh = ssh_client
@@ -641,7 +470,7 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
         except Exception:
             pass
 
-    # Upload files to the server
+    # Upload files to the server using the same SSH connection
     remote_dir, remote_paths = upload_files(file_list, username, password, ssh, proxy_host, temp_dir, progress_callback)
 
     if not remote_dir or not remote_paths:
@@ -649,75 +478,95 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
 
     if progress_callback:
         try:
-            progress_callback(80, "Files uploaded. Creating SSH tunnel...")
+            progress_callback(80, "Files uploaded. Creating connection to target host...")
         except Exception:
             pass
 
-    # Run the turnin command through SSH tunnel
+    # Execute the turnin command on the target host using a single SSH connection with channel forwarding
     try:
-        # Create SSH tunnel to the target host through the proxy
-        with SSHTunnelForwarder(
-            ssh_host=proxy_host,
-            ssh_port=22,
-            ssh_username=username,
-            ssh_password=password,
-            remote_bind_address=(host_to_connect, 22),
-            local_bind_address=('127.0.0.1', 0)  # Let system choose port
-        ) as tunnel:
-            # Create a new SSH client to connect to the tunneled host
-            target_ssh = paramiko.SSHClient()
-            add_ssh_keys(target_ssh, host_to_connect)  # Pass actual hostname for proper key verification
-
-            # Connect through the tunnel with timeout and fallback authentication
+        if progress_callback:
             try:
-                target_ssh.connect('127.0.0.1',
-                                 port=tunnel.local_bind_port,
-                                 username=username,
-                                 password=password,
-                                 timeout=15,  # Reduced to 15 second connection timeout
-                                 banner_timeout=10,  # Reduced to 10 second banner timeout
-                                 allow_agent=False,  # Disable SSH agent key usage
-                                 look_for_keys=False)  # Disable automatic private key discovery
-            except paramiko.AuthenticationException:
-                # Try keyboard-interactive authentication as fallback
-                target_ssh.close()
-                target_ssh = paramiko.SSHClient()
-                add_ssh_keys(target_ssh, host_to_connect)  # Pass actual hostname for proper key verification
-                
-                # Connect without authentication first
-                transport = paramiko.Transport(('127.0.0.1', tunnel.local_bind_port))
-                transport.connect()
-                
-                # Try keyboard-interactive authentication
-                def auth_handler(title, instructions, prompt_list):
-                    # For keyboard-interactive, return the password for all prompts
-                    if prompt_list:
-                        return [password] * len(prompt_list)
-                    return []
-                
-                transport.auth_interactive(username, auth_handler)
-                target_ssh._transport = transport
+                progress_callback(85, "Connecting to target host and running turnin command...")
+            except Exception:
+                pass
 
-            if progress_callback:
-                try:
-                    progress_callback(85, "Tunnel created. Running turnin command...")
-                except Exception:
-                    pass
+        # Create a direct channel to the target host using the existing SSH connection
+        transport = ssh.get_transport()
+        
+        # Open a channel to the target host through the proxy
+        try:
+            target_channel = transport.open_channel(
+                'direct-tcpip',
+                (host_to_connect, 22),
+                ('127.0.0.1', 0)
+            )
+        except Exception as e:
+            return False, f"Failed to create channel to target host: {str(e)}"
+        
+        # Create a new SSH client for the target host using the channel
+        target_ssh = paramiko.SSHClient()
+        add_ssh_keys(target_ssh, host_to_connect)  # Pass actual hostname for proper key verification
+        
+        # Use the channel as a transport
+        target_transport = paramiko.Transport(target_channel)
+        target_transport.start_client()
+        
+        # Authenticate to the target host
+        try:
+            target_transport.auth_password(username, password)
+        except paramiko.AuthenticationException:
+            # Try keyboard-interactive authentication as fallback
+            def auth_handler(title, instructions, prompt_list):
+                if prompt_list:
+                    return [password] * len(prompt_list)
+                return []
+            
+            target_transport.auth_interactive(username, auth_handler)
+        
+        # Attach the transport to the SSH client
+        target_ssh._transport = target_transport
 
-            # Build and execute the turnin command WITHOUT automatic yes responses
-            cmd = f"cd {remote_dir} && turnin {assignment} {' '.join(remote_paths)}"
-            print(f"Executing command: {cmd}")
-            
-            if interactive_callback:
-                interactive_callback("output", f"Executing: {cmd}\n")
-            
-            stdin, stdout, stderr = target_ssh.exec_command(cmd, timeout=60)
-            
-            # Handle interactive turnin execution
-            output = handle_interactive_execution(stdin, stdout, stderr, interactive_callback)
+        # Build and execute the turnin command with automatic yes responses 
+        # Since the user mentioned the interactive system isn't working and prefers simplicity
+        cmd = f"cd {remote_dir} && yes | turnin {assignment} {' '.join(remote_paths)}"
+        print(f"Executing command: {cmd}")
+        
+        if interactive_callback:
+            interactive_callback("output", f"Executing: {cmd}\n")
+        
+        stdin, stdout, stderr = target_ssh.exec_command(cmd, timeout=60)
+        
+        # Read all output
+        output_lines = []
+        
+        # Read stdout
+        for line in stdout:
+            line = line.strip()
+            if line:
+                output_lines.append(line)
+                if interactive_callback:
+                    interactive_callback("output", line + "\n")
+        
+        # Read stderr  
+        for line in stderr:
+            line = line.strip()
+            if line:
+                output_lines.append(f"ERROR: {line}")
+                if interactive_callback:
+                    interactive_callback("output", f"ERROR: {line}\n")
+        
+        output = "\n".join(output_lines)
 
-            # Close connection
+        # Close target connection
+        try:
             target_ssh.close()
+        except:
+            pass
+        
+        try:
+            target_channel.close()
+        except:
+            pass
 
         if progress_callback:
             try:
@@ -737,94 +586,4 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
         return False, f"Error executing turnin command: {str(e)}"
 
 
-def handle_interactive_execution(stdin, stdout, stderr, interactive_callback=None):
-    """Handle interactive turnin command execution"""
-    import time
-    import select
-    
-    full_output = ""
-    
-    try:
-        # Set non-blocking mode for stdout and stderr
-        stdout.channel.setblocking(0)
-        stderr.channel.setblocking(0)
-        
-        while True:
-            # Check if there's output to read
-            ready, _, _ = select.select([stdout.channel, stderr.channel], [], [], 1.0)
-            
-            if stdout.channel in ready:
-                try:
-                    chunk = stdout.read(1024)
-                    if chunk:
-                        text = chunk.decode('utf-8', errors='replace')
-                        full_output += text
-                        
-                        if interactive_callback:
-                            interactive_callback("output", text)
-                        
-                        # Check if this looks like a prompt
-                        lines = text.strip().split('\n')
-                        for line in lines:
-                            if line.strip() and (
-                                '?' in line or 
-                                '[' in line and ']' in line or
-                                'continue' in line.lower() or
-                                'proceed' in line.lower() or
-                                'confirm' in line.lower() or
-                                'submit' in line.lower()
-                            ):
-                                # This looks like a prompt, ask user for input
-                                if interactive_callback:
-                                    response = interactive_callback("prompt", line.strip())
-                                    if response:
-                                        stdin.write(f"{response}\n")
-                                        stdin.flush()
-                                        full_output += f"\n> {response}\n"
-                                        time.sleep(0.2)  # Brief pause after sending response
-                except:
-                    pass
-            
-            if stderr.channel in ready:
-                try:
-                    chunk = stderr.read(1024)
-                    if chunk:
-                        text = chunk.decode('utf-8', errors='replace')
-                        full_output += text
-                        if interactive_callback:
-                            interactive_callback("output", text)
-                except:
-                    pass
-            
-            # Check if the command has finished
-            if stdout.channel.exit_status_ready():
-                break
-                
-            # Prevent infinite loop
-            time.sleep(0.1)
-        
-        # Read any remaining output
-        try:
-            remaining_stdout = stdout.read().decode('utf-8', errors='replace')
-            remaining_stderr = stderr.read().decode('utf-8', errors='replace')
-            remaining = remaining_stdout + remaining_stderr
-            if remaining:
-                full_output += remaining
-                if interactive_callback:
-                    interactive_callback("output", remaining)
-        except:
-            pass
-            
-    except Exception as e:
-        error_msg = f"Error during interactive execution: {str(e)}"
-        full_output += f"\n{error_msg}"
-        if interactive_callback:
-            interactive_callback("output", error_msg)
-    finally:
-        # Close stdin
-        try:
-            stdin.close()
-        except:
-            pass
-    
-    return full_output
+# Interactive execution handling removed - using automatic responses instead

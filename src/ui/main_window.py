@@ -8,17 +8,12 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QThread
 from ..utils.ssh import submit_files, connect_to_proxy
 from .about_window import AboutWindow
-from .interactive_turnin_dialog import InteractiveTurninDialog
 
 class UploadWorker(QObject):
     """Worker to handle file uploads in a background thread"""
     progress_updated = pyqtSignal(float, str)
     upload_finished = pyqtSignal(bool, str)
     command_output = pyqtSignal(str)
-    # New signals for interactive turnin
-    interactive_output = pyqtSignal(str)  # For streaming output
-    interactive_prompt = pyqtSignal(str)  # For prompts requiring user input
-    waiting_for_user_input = pyqtSignal()
 
     def __init__(self, proxy_host, host_to_connect, username, password,
                  assignment, files, temp_dir, ssh=None):
@@ -31,10 +26,6 @@ class UploadWorker(QObject):
         self.files = files
         self.temp_dir = temp_dir
         self.ssh = ssh
-        
-        # For interactive communication
-        self.pending_user_response = None
-        self.user_response_received = False
 
     def run(self):
         """Run the upload process"""
@@ -48,8 +39,7 @@ class UploadWorker(QObject):
                 self.files,
                 self.temp_dir,
                 self.ssh,
-                progress_callback=self.update_progress,
-                interactive_callback=self.handle_interactive_callback
+                progress_callback=self.update_progress
             )
 
             # Emit the command output
@@ -65,37 +55,6 @@ class UploadWorker(QObject):
     def update_progress(self, percent, message):
         """Update progress display"""
         self.progress_updated.emit(percent, message)
-        
-    def handle_interactive_callback(self, callback_type, data):
-        """Handle interactive callbacks from SSH execution"""
-        if callback_type == "output":
-            # Stream output to the interactive dialog
-            self.interactive_output.emit(data)
-            return None
-        elif callback_type == "prompt":
-            # This is a prompt requiring user input
-            self.interactive_prompt.emit(data)
-            self.waiting_for_user_input.emit()
-            
-            # Wait for user response (blocking but in worker thread)
-            self.user_response_received = False
-            while not self.user_response_received:
-                # Allow Qt to process events
-                from PyQt6.QtCore import QCoreApplication
-                QCoreApplication.processEvents()
-                import time
-                time.sleep(0.01)  # Small delay to prevent busy waiting
-            
-            response = self.pending_user_response
-            self.pending_user_response = None
-            return response
-        
-        return None
-    
-    def set_user_response(self, response):
-        """Set the user's response to a prompt"""
-        self.pending_user_response = response
-        self.user_response_received = True
 
 
 class MainWindow(QMainWindow):
@@ -277,9 +236,6 @@ class MainWindow(QMainWindow):
             self.setup_progress_ui()
             self.submit_btn.setEnabled(False)
 
-            # Create interactive dialog
-            self.interactive_dialog = InteractiveTurninDialog(self)
-
             # Create worker and thread
             self.thread = QThread()
             self.worker = UploadWorker(
@@ -301,15 +257,6 @@ class MainWindow(QMainWindow):
             self.worker.progress_updated.connect(self.update_progress, Qt.ConnectionType.QueuedConnection)
             self.worker.upload_finished.connect(self.handle_upload_finished, Qt.ConnectionType.QueuedConnection)
             self.worker.command_output.connect(self.display_command_output, Qt.ConnectionType.QueuedConnection)
-            
-            # Interactive turnin connections
-            self.worker.interactive_output.connect(self.interactive_dialog.add_output, Qt.ConnectionType.QueuedConnection)
-            self.worker.interactive_prompt.connect(self.interactive_dialog.show_prompt, Qt.ConnectionType.QueuedConnection)
-            self.worker.waiting_for_user_input.connect(self.show_interactive_dialog, Qt.ConnectionType.QueuedConnection)
-            
-            # Connect dialog responses back to worker
-            self.interactive_dialog.user_response.connect(self.worker.set_user_response, Qt.ConnectionType.QueuedConnection)
-            self.interactive_dialog.dialog_closed.connect(self.handle_dialog_closed)
 
             # Clean up connections
             self.worker.upload_finished.connect(self.thread.quit)
@@ -319,27 +266,10 @@ class MainWindow(QMainWindow):
             # Start the thread
             self.thread.start()
 
-    def show_interactive_dialog(self):
-        """Show the interactive dialog when user input is needed"""
-        if hasattr(self, 'interactive_dialog'):
-            self.interactive_dialog.show()
-            self.interactive_dialog.raise_()
-            self.interactive_dialog.activateWindow()
-            
-    def handle_dialog_closed(self):
-        """Handle when the interactive dialog is closed"""
-        # If the worker is still running, we might need to handle premature closure
-        if hasattr(self, 'worker') and self.worker:
-            # Send empty response to unblock worker if it's waiting
-            self.worker.set_user_response("")
-
     def display_command_output(self, text):
-        """Display command output in the interactive dialog if available"""
-        if hasattr(self, 'interactive_dialog'):
-            # Add final output to the interactive dialog
-            self.interactive_dialog.add_output(f"\n--- Final Command Output ---\n{text}")
-        # If no interactive dialog exists, we'll just skip this
-        # since the output is already shown through the interactive_output signal
+        """Display command output"""
+        # Show output in a simple message box or status
+        print(f"Command output: {text}")
 
     def setup_progress_ui(self):
         """Set up progress bar and status label"""
@@ -365,7 +295,6 @@ class MainWindow(QMainWindow):
             main_layout.insertWidget(main_layout.count() - 1, self.progress_widget)
         # Show the progress widget
         self.progress_widget.show()
-        # Disable submit button during upload
 
     def update_progress(self, percent, message):
         """Update progress bar and status message"""
@@ -376,10 +305,6 @@ class MainWindow(QMainWindow):
         """Handle upload completion"""
         # Re-enable submit button
         self.submit_btn.setEnabled(True)
-
-        # Show completion in interactive dialog if it exists
-        if hasattr(self, 'interactive_dialog'):
-            self.interactive_dialog.show_completion_message(success, message)
 
         if success:
             QMessageBox.information(self, "Success", message)
