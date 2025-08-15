@@ -6,12 +6,44 @@ import socket
 import paramiko
 import threading
 import select
+import hashlib
+import base64
 
 try:
     from PyQt6.QtWidgets import QMessageBox
     PYQT_AVAILABLE = True
 except ImportError:
     PYQT_AVAILABLE = False
+
+
+class KnownHostKeyPolicy(paramiko.MissingHostKeyPolicy):
+    """
+    Host key policy that verifies against known hosts and hardcoded keys
+    """
+    
+    def __init__(self):
+        try:
+            from config import SSH_KEYS
+            self.ssh_keys = SSH_KEYS
+        except ImportError:
+            # If config module is not available (e.g., during testing), use empty list
+            self.ssh_keys = []
+    
+    def missing_host_key(self, client, hostname, key):
+        """
+        Check if the host key matches any of our known hardcoded keys
+        """
+        key_type = key.get_name()
+        key_data = key.get_base64()
+        
+        # Check against hardcoded keys
+        for host, stored_type, stored_key in self.ssh_keys:
+            if host == hostname and stored_type == key_type and stored_key == key_data:
+                print(f"Host key verified for {hostname} using known keys")
+                return  # Accept the key
+        
+        # If no match found, reject
+        raise paramiko.SSHException(f"Host key verification failed for {hostname} - unknown host key")
 
 
 class SSHTunnelForwarder:
@@ -162,13 +194,28 @@ class SSHTunnelForwarder:
 
 def add_ssh_keys(ssh):
     """
-    Configure SSH client for password-only authentication
+    Configure SSH client with host key verification and password-only authentication
 
     Args:
         ssh (paramiko.SSHClient): The SSH client to configure
     """
-    # Use password authentication only - automatically accept host keys
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    # Load system and user known_hosts files for host key verification
+    try:
+        # Load system-wide known_hosts
+        ssh.load_system_host_keys()
+    except Exception as e:
+        print(f"Warning: Could not load system host keys: {e}")
+    
+    try:
+        # Load user's known_hosts file
+        user_known_hosts = os.path.expanduser("~/.ssh/known_hosts")
+        if os.path.exists(user_known_hosts):
+            ssh.load_host_keys(user_known_hosts)
+    except Exception as e:
+        print(f"Warning: Could not load user host keys: {e}")
+    
+    # Set host key verification policy (falls back to hardcoded keys for known servers)
+    ssh.set_missing_host_key_policy(KnownHostKeyPolicy())
 
 def get_available_server(ssh):
     """

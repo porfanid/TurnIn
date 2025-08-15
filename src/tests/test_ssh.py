@@ -4,7 +4,10 @@ import paramiko
 import os
 
 # Import module to test
-from src.utils.ssh import (
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.ssh import (
     add_ssh_keys, get_available_server, connect_to_proxy,
     upload_files, submit_files
 )
@@ -13,29 +16,34 @@ from src.utils.ssh import (
 class TestSSHUtils(unittest.TestCase):
 
     def test_add_ssh_keys(self):
-        """Test adding SSH keys to client with password-only authentication"""
+        """Test adding SSH keys to client with host key verification and password-only user authentication"""
         # Create a mock SSH client
         mock_ssh = MagicMock()
         
         # Call the function
         add_ssh_keys(mock_ssh)
 
-        # Verify that AutoAddPolicy is set (password-only authentication)
+        # Verify that host key verification is configured
         mock_ssh.set_missing_host_key_policy.assert_called_once()
-        # Check that the policy is an instance of AutoAddPolicy
+        # Check that the policy is an instance of KnownHostKeyPolicy
+        from utils.ssh import KnownHostKeyPolicy
         policy = mock_ssh.set_missing_host_key_policy.call_args[0][0]
-        self.assertIsInstance(policy, paramiko.AutoAddPolicy)
+        self.assertIsInstance(policy, KnownHostKeyPolicy)
 
-    def test_add_ssh_keys_simplified(self):
-        """Test adding SSH keys with simplified password-only approach"""
+        # Verify system and user known_hosts loading attempts
+        mock_ssh.load_system_host_keys.assert_called_once()
+
+    def test_add_ssh_keys_with_host_verification(self):
+        """Test adding SSH keys with host key verification"""
         mock_ssh = MagicMock()
         
         add_ssh_keys(mock_ssh)
         
-        # Should only set AutoAddPolicy for password-only authentication
+        # Should set KnownHostKeyPolicy for host verification
         mock_ssh.set_missing_host_key_policy.assert_called_once()
+        from utils.ssh import KnownHostKeyPolicy
         policy = mock_ssh.set_missing_host_key_policy.call_args[0][0]
-        self.assertIsInstance(policy, paramiko.AutoAddPolicy)
+        self.assertIsInstance(policy, KnownHostKeyPolicy)
 
 
 
@@ -76,8 +84,8 @@ class TestSSHUtils(unittest.TestCase):
         # Verify no server was found
         self.assertIsNone(result)
 
-    @patch('src.utils.ssh.paramiko.SSHClient')
-    @patch('src.utils.ssh.add_ssh_keys')
+    @patch('utils.ssh.paramiko.SSHClient')
+    @patch('utils.ssh.add_ssh_keys')
     def test_connect_to_proxy_success(self, mock_add_keys, mock_ssh_client):
         """Test successful connection to proxy"""
         # Create mocks
@@ -96,10 +104,10 @@ class TestSSHUtils(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(host, "dl-server")
         self.assertEqual(ssh, mock_ssh)
-        mock_ssh.connect.assert_called_once_with("proxy.host", username="user", password="pass", timeout=15, banner_timeout=10)
+        mock_ssh.connect.assert_called_once_with("proxy.host", username="user", password="pass", timeout=15, banner_timeout=100)
 
-    @patch('src.utils.ssh.paramiko.SSHClient')
-    @patch('src.utils.ssh.PYQT_AVAILABLE', False)
+    @patch('utils.ssh.paramiko.SSHClient')
+    @patch('utils.ssh.PYQT_AVAILABLE', False)
     def test_connect_to_proxy_no_hosts(self, mock_ssh_client):
         """Test connection when no hosts are available"""
         # Create mocks
@@ -119,7 +127,7 @@ class TestSSHUtils(unittest.TestCase):
         self.assertIsNone(host)
         self.assertIsNone(ssh)
 
-    @patch('src.utils.ssh.paramiko.SSHClient')
+    @patch('utils.ssh.paramiko.SSHClient')
     def test_connect_to_proxy_auth_error(self, mock_ssh_client):
         """Test connection with authentication error"""
         # Create mocks
