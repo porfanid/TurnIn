@@ -1,10 +1,13 @@
 import unittest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock, call, mock_open
 import paramiko
 import os
 
 # Import module to test
-from src.utils.ssh import (
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.ssh import (
     add_ssh_keys, get_available_server, connect_to_proxy,
     upload_files, submit_files
 )
@@ -13,18 +16,36 @@ from src.utils.ssh import (
 class TestSSHUtils(unittest.TestCase):
 
     def test_add_ssh_keys(self):
-        """Test adding SSH keys to client"""
+        """Test adding SSH keys to client with host key verification and password-only user authentication"""
         # Create a mock SSH client
         mock_ssh = MagicMock()
-
+        
         # Call the function
         add_ssh_keys(mock_ssh)
 
-        # Verify the correct policy was set
+        # Verify that host key verification is configured
         mock_ssh.set_missing_host_key_policy.assert_called_once()
-        # Check that the policy is an instance of AutoAddPolicy
+        # Check that the policy is an instance of KnownHostKeyPolicy
+        from utils.ssh import KnownHostKeyPolicy
         policy = mock_ssh.set_missing_host_key_policy.call_args[0][0]
-        self.assertIsInstance(policy, paramiko.AutoAddPolicy)
+        self.assertIsInstance(policy, KnownHostKeyPolicy)
+
+        # Verify system and user known_hosts loading attempts
+        mock_ssh.load_system_host_keys.assert_called_once()
+
+    def test_add_ssh_keys_with_host_verification(self):
+        """Test adding SSH keys with host key verification"""
+        mock_ssh = MagicMock()
+        
+        add_ssh_keys(mock_ssh)
+        
+        # Should set KnownHostKeyPolicy for host verification
+        mock_ssh.set_missing_host_key_policy.assert_called_once()
+        from utils.ssh import KnownHostKeyPolicy
+        policy = mock_ssh.set_missing_host_key_policy.call_args[0][0]
+        self.assertIsInstance(policy, KnownHostKeyPolicy)
+
+
 
     def test_get_available_server_found(self):
         """Test getting an available server when one exists"""
@@ -63,8 +84,8 @@ class TestSSHUtils(unittest.TestCase):
         # Verify no server was found
         self.assertIsNone(result)
 
-    @patch('src.utils.ssh.paramiko.SSHClient')
-    @patch('src.utils.ssh.add_ssh_keys')
+    @patch('utils.ssh.paramiko.SSHClient')
+    @patch('utils.ssh.add_ssh_keys')
     def test_connect_to_proxy_success(self, mock_add_keys, mock_ssh_client):
         """Test successful connection to proxy"""
         # Create mocks
@@ -77,17 +98,18 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.exec_command.return_value = (None, mock_stdout, None)
 
         # Call the function
-        success, host, ssh = connect_to_proxy("user", "pass", "proxy.host")
+        success, host, ssh, error_type = connect_to_proxy("user", "pass", "proxy.host")
 
         # Verify results
         self.assertTrue(success)
         self.assertEqual(host, "dl-server")
         self.assertEqual(ssh, mock_ssh)
-        mock_ssh.connect.assert_called_once_with("proxy.host", username="user", password="pass")
+        self.assertIsNone(error_type)
+        mock_ssh.connect.assert_called_once_with("proxy.host", username="user", password="pass", timeout=15, banner_timeout=10, allow_agent=False, look_for_keys=False)
 
-    @patch('src.utils.ssh.paramiko.SSHClient')
-    @patch('src.utils.ssh.QMessageBox')
-    def test_connect_to_proxy_no_hosts(self, mock_msgbox, mock_ssh_client):
+    @patch('utils.ssh.paramiko.SSHClient')
+    @patch('utils.ssh.PYQT_AVAILABLE', False)
+    def test_connect_to_proxy_no_hosts(self, mock_ssh_client):
         """Test connection when no hosts are available"""
         # Create mocks
         mock_ssh = MagicMock()
@@ -99,15 +121,15 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.exec_command.return_value = (None, mock_stdout, None)
 
         # Call the function
-        success, host, ssh = connect_to_proxy("user", "pass", "proxy.host")
+        success, host, ssh, error_type = connect_to_proxy("user", "pass", "proxy.host")
 
         # Verify results
         self.assertFalse(success)
         self.assertIsNone(host)
         self.assertIsNone(ssh)
-        mock_msgbox.critical.assert_called_once()
+        self.assertEqual(error_type, 'other')
 
-    @patch('src.utils.ssh.paramiko.SSHClient')
+    @patch('utils.ssh.paramiko.SSHClient')
     def test_connect_to_proxy_auth_error(self, mock_ssh_client):
         """Test connection with authentication error"""
         # Create mocks
@@ -116,17 +138,16 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.connect.side_effect = paramiko.AuthenticationException()
 
         # Call the function
-        success, host, ssh = connect_to_proxy("user", "pass", "proxy.host")
+        success, host, ssh, error_type = connect_to_proxy("user", "pass", "proxy.host")
 
         # Verify results
         self.assertFalse(success)
         self.assertIsNone(host)
         self.assertIsNone(ssh)
+        self.assertEqual(error_type, 'auth')
 
-    @patch('src.utils.ssh.paramiko.Transport')
-    @patch('src.utils.ssh.paramiko.SFTPClient')
-    def test_upload_files(self, mock_sftp_client, mock_transport):
-        """Test uploading files to remote server"""
+    def test_upload_files(self):
+        """Test uploading files to remote server using existing SSH connection"""
         # Create mocks
         mock_ssh = MagicMock()
         mock_stdout = MagicMock()
@@ -134,7 +155,7 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.exec_command.return_value = (None, mock_stdout, None)
 
         mock_sftp = MagicMock()
-        mock_sftp_client.from_transport.return_value = mock_sftp
+        mock_ssh.open_sftp.return_value = mock_sftp
 
         # Create test files
         test_files = [
@@ -154,10 +175,8 @@ class TestSSHUtils(unittest.TestCase):
         self.assertEqual(remote_dir, "/home/user/tempdir/")
         self.assertEqual(remote_paths, ["file1.txt", "file2.py"])
 
-        # Verify SFTP usage
-        mock_transport.assert_called_once_with(("host", 22))
-        mock_transport.return_value.connect.assert_called_once_with(None, "user", "pass")
-        mock_sftp_client.from_transport.assert_called_once()
+        # Verify SFTP usage - should use existing SSH connection
+        mock_ssh.open_sftp.assert_called_once()
 
         # Verify mkdir called
         mock_sftp.mkdir.assert_called_once_with("/home/user/tempdir/")
@@ -168,6 +187,9 @@ class TestSSHUtils(unittest.TestCase):
             call("/path/to/file1.txt", "/home/user/tempdir/file1.txt"),
             call("/path/to/file2.py", "/home/user/tempdir/file2.py")
         ])
+
+        # Verify SFTP cleanup
+        mock_sftp.close.assert_called_once()
 
         # Verify progress callback
         self.assertTrue(mock_callback.call_count >= 3)  # At least start, middle, end

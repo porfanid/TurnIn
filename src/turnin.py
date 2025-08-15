@@ -31,9 +31,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-from ui.login_window import LoginWindow
-from utils.version_check import check_version
-from config import APP_NAME, APP_VERSION, SENTRY_DSN
+from .ui.login_window import LoginWindow
+from .utils.version_check import check_version
+from .config import APP_NAME, APP_VERSION, SENTRY_DSN
 
 
 def initialize_sentry():
@@ -70,8 +70,18 @@ def main():
 
     # Show login window
     login_window = LoginWindow()
-    if not login_window.check_saved_credentials():
+    login_status = login_window.check_saved_credentials()
+    
+    # Handle different login statuses
+    if login_status == 'timeout':
+        # Exit immediately on timeout
+        logger.info("Application exiting due to SSH connection timeout")
+        return
+    elif login_status == 'show_login':
+        # Show login window for manual credentials entry
         login_window.show()
+    # If login_status == 'success', the main window is already shown and login window is hidden
+    
     logger.info("Application UI initialized and displayed")
 
     # Start application event loop

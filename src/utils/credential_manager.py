@@ -3,6 +3,7 @@ Credential management utilities for securely storing and retrieving user credent
 """
 import json
 import keyring
+import os
 from cryptography.fernet import Fernet, InvalidToken
 from PyQt6.QtWidgets import QMessageBox
 from os.path import expanduser, join
@@ -60,6 +61,33 @@ def save_credentials(username, password):
     with open(get_credentials_path(), 'wb') as f:
         f.write(encrypted_data)
 
+def clear_credentials():
+    """
+    Clear saved credentials by removing both the credentials file and keyring entry
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    success = True
+    
+    try:
+        # Remove credentials file if it exists
+        creds_path = get_credentials_path()
+        if os.path.exists(creds_path):
+            os.remove(creds_path)
+    except Exception as e:
+        print(f"Error removing credentials file: {e}")
+        success = False
+    
+    try:
+        # Remove keyring entry
+        keyring.delete_password("turnin", "encryption_key")
+    except Exception as e:
+        # It's okay if the keyring entry doesn't exist
+        print(f"Note: Could not remove keyring entry (may not exist): {e}")
+    
+    return success
+
 def load_credentials():
     """
     Load and decrypt credentials from file
@@ -84,7 +112,15 @@ def load_credentials():
             password = deserialized_data['password']
             return username, password
         except InvalidToken:
-            QMessageBox.critical(None, "Error", "Could not decrypt saved credentials.")
+            QMessageBox.critical(
+                None, 
+                "Σφάλμα Διαπιστευτηρίων", 
+                "Τα αποθηκευμένα διαπιστευτήρια δεν μπορούν να αναγνωστούν.\n\n"
+                "Αυτό μπορεί να συμβεί αν:\n"
+                "• Έχει αλλάξει το σύστημα\n"
+                "• Έχει διαγραφεί το κλειδί κρυπτογράφησης\n\n"
+                "Προτείνεται να διαγράψετε τα αποθηκευμένα διαπιστευτήρια και να συνδεθείτε ξανά."
+            )
             return None
     except FileNotFoundError:
         return None

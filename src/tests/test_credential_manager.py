@@ -8,7 +8,7 @@ from cryptography.fernet import Fernet
 # Import module to test
 from src.utils.credential_manager import (
     get_credentials_path, generate_key, get_key,
-    save_credentials, load_credentials
+    save_credentials, load_credentials, clear_credentials
 )
 
 class TestCredentialManager(unittest.TestCase):
@@ -136,6 +136,76 @@ class TestCredentialManager(unittest.TestCase):
 
         # Verify results
         self.assertIsNone(result)
+
+    @patch('src.utils.credential_manager.keyring')
+    @patch('src.utils.credential_manager.get_credentials_path')
+    def test_clear_credentials(self, mock_get_path, mock_keyring):
+        """Test clearing saved credentials"""
+        # Create a temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        mock_get_path.return_value = temp_file.name
+        
+        try:
+            # Verify file exists
+            self.assertTrue(os.path.exists(temp_file.name))
+            
+            # Call clear_credentials
+            result = clear_credentials()
+            
+            # Verify file was deleted
+            self.assertFalse(os.path.exists(temp_file.name))
+            
+            # Verify keyring deletion was attempted
+            mock_keyring.delete_password.assert_called_once_with("turnin", "encryption_key")
+            
+            # Verify function returned True
+            self.assertTrue(result)
+            
+        finally:
+            # Clean up in case the function failed
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+
+    @patch('src.utils.credential_manager.QMessageBox')
+    @patch('src.utils.credential_manager.get_credentials_path')
+    @patch('src.utils.credential_manager.get_key')
+    def test_load_credentials_invalid_token(self, mock_get_key, mock_get_path, mock_msgbox):
+        """Test loading credentials with invalid token shows improved error message"""
+        # Setup mocks and create test file with invalid encrypted data
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        mock_get_path.return_value = temp_file.name
+        
+        # Write invalid encrypted data
+        with open(temp_file.name, 'wb') as f:
+            f.write(b"invalid_encrypted_data")
+        
+        # Generate a real key
+        key = Fernet.generate_key()
+        mock_get_key.return_value = key
+        
+        try:
+            # Call the function
+            result = load_credentials()
+            
+            # Verify result is None
+            self.assertIsNone(result)
+            
+            # Verify improved error message was shown
+            mock_msgbox.critical.assert_called_once()
+            call_args = mock_msgbox.critical.call_args[0]
+            
+            # Check title is in Greek
+            self.assertEqual(call_args[1], "Σφάλμα Διαπιστευτηρίων")
+            
+            # Check message contains expected Greek phrases
+            message = call_args[2]
+            self.assertIn("διαπιστευτήρια δεν μπορούν να αναγνωστούν", message)
+            self.assertIn("συνδεθείτε ξανά", message)
+            
+        finally:
+            # Clean up
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
 
 if __name__ == '__main__':
     unittest.main()
