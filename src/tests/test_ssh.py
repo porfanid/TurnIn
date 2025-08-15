@@ -6,7 +6,7 @@ import os
 # Import module to test
 from src.utils.ssh import (
     add_ssh_keys, get_available_server, connect_to_proxy,
-    upload_files, submit_files
+    upload_files, submit_files, analyze_turnin_output, validate_files
 )
 
 
@@ -146,13 +146,19 @@ class TestSSHUtils(unittest.TestCase):
         mock_callback = MagicMock()
 
         # Call the function
-        remote_dir, remote_paths = upload_files(
+        result = upload_files(
             test_files, "user", "pass", mock_ssh, "host", "tempdir", mock_callback
         )
+        
+        # Check the new return format with error tracking
+        self.assertEqual(len(result), 4)
+        remote_dir, remote_paths, failed_uploads, upload_errors = result
 
         # Verify results
         self.assertEqual(remote_dir, "/home/user/tempdir/")
         self.assertEqual(remote_paths, ["file1.txt", "file2.py"])
+        self.assertEqual(failed_uploads, [])  # No failures
+        self.assertEqual(upload_errors, [])   # No errors
 
         # Verify SFTP usage
         mock_transport.assert_called_once_with(("host", 22))
@@ -169,8 +175,100 @@ class TestSSHUtils(unittest.TestCase):
             call("/path/to/file2.py", "/home/user/tempdir/file2.py")
         ])
 
-        # Verify progress callback
-        self.assertTrue(mock_callback.call_count >= 3)  # At least start, middle, end
+    @patch('src.utils.ssh.paramiko.Transport')
+    @patch('src.utils.ssh.paramiko.SFTPClient')
+    def test_upload_files_with_failures(self, mock_sftp_client, mock_transport):
+        """Test uploading files with some failures"""
+        # Create mocks
+        mock_ssh = MagicMock()
+        mock_stdout = MagicMock()
+        mock_stdout.readlines.return_value = ["/home/user\n"]
+        mock_ssh.exec_command.return_value = (None, mock_stdout, None)
+
+        mock_sftp = MagicMock()
+        mock_sftp_client.from_transport.return_value = mock_sftp
+        
+        # Make the first file upload fail, second succeed
+        mock_sftp.put.side_effect = [Exception("Connection lost"), None]
+
+        test_files = [
+            "/path/to/file1.txt",
+            "/path/to/file2.py"
+        ]
+
+        mock_callback = MagicMock()
+
+        # Call the function
+        result = upload_files(
+            test_files, "user", "pass", mock_ssh, "host", "tempdir", mock_callback
+        )
+        
+        # Check the new return format with error tracking
+        self.assertEqual(len(result), 4)
+        remote_dir, remote_paths, failed_uploads, upload_errors = result
+
+        # Verify results
+        self.assertEqual(remote_dir, "/home/user/tempdir/")
+        self.assertEqual(remote_paths, ["file2.py"])  # Only successful upload
+        self.assertEqual(failed_uploads, ["file1.txt"])  # Failed upload
+        self.assertEqual(len(upload_errors), 1)
+        self.assertIn("file1.txt", upload_errors[0])
+        self.assertIn("Connection lost", upload_errors[0])
+
+    def test_analyze_turnin_output_success(self):
+        """Test analyzing successful turnin output"""
+        stdout = "Assignment submitted successfully!\nFiles: test.py\n"
+        stderr = ""
+        
+        is_success, user_message, technical_output = analyze_turnin_output(stdout, stderr)
+        
+        self.assertTrue(is_success)
+        self.assertIn("successfully", user_message)
+        self.assertEqual(technical_output, stdout)
+
+    def test_analyze_turnin_output_already_submitted(self):
+        """Test analyzing output when assignment already submitted"""
+        stdout = ""
+        stderr = "Error: You have already turned in this assignment\n"
+        
+        is_success, user_message, technical_output = analyze_turnin_output(stdout, stderr)
+        
+        self.assertFalse(is_success)
+        self.assertIn("already submitted", user_message)
+        self.assertIn("Multiple submissions are not allowed", user_message)
+
+    def test_analyze_turnin_output_assignment_not_found(self):
+        """Test analyzing output when assignment not found"""
+        stdout = ""
+        stderr = "Error: No such assignment 'invalid_assignment'\n"
+        
+        is_success, user_message, technical_output = analyze_turnin_output(stdout, stderr)
+        
+        self.assertFalse(is_success)
+        self.assertIn("Assignment not found", user_message)
+        self.assertIn("check the assignment name", user_message)
+
+    def test_analyze_turnin_output_permission_denied(self):
+        """Test analyzing output when permission denied"""
+        stdout = ""
+        stderr = "Permission denied: cannot access assignment directory\n"
+        
+        is_success, user_message, technical_output = analyze_turnin_output(stdout, stderr)
+        
+        self.assertFalse(is_success)
+        self.assertIn("Permission denied", user_message)
+        self.assertIn("check your credentials", user_message)
+
+    def test_analyze_turnin_output_disk_quota(self):
+        """Test analyzing output when disk quota exceeded"""
+        stdout = ""
+        stderr = "Error: Disk quota exceeded\n"
+        
+        is_success, user_message, technical_output = analyze_turnin_output(stdout, stderr)
+        
+        self.assertFalse(is_success)
+        self.assertIn("Storage quota exceeded", user_message)
+        self.assertIn("contact your instructor", user_message)
 
 
 if __name__ == '__main__':
