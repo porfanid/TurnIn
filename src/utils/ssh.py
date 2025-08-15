@@ -213,7 +213,7 @@ def connect_to_proxy(username, password, proxy_host):
             username=username, 
             password=password, 
             timeout=15,  # Reduced to 15 second connection timeout
-            banner_timeout=10  # Reduced to 10 second banner timeout
+            banner_timeout=100  # Reduced to 10 second banner timeout
         )
 
         # Find available host
@@ -406,7 +406,7 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
                     pass
 
             # Build and execute the turnin command
-            cmd = f"cd {remote_dir} && turnin {assignment} {' '.join(remote_paths)}"
+            cmd = f"cd {remote_dir} && yes|turnin {assignment} {' '.join(remote_paths)}"
             print(cmd)
             stdin, stdout, stderr = target_ssh.exec_command(cmd, timeout=30)
             # Send "y" to the command to confirm any prompts
