@@ -10,10 +10,119 @@ import hashlib
 import base64
 
 try:
-    from PyQt6.QtWidgets import QMessageBox
+    from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit
+    from PyQt6.QtCore import Qt
     PYQT_AVAILABLE = True
+    
+    class HostKeyVerificationDialog(QDialog):
+        """Dialog for verifying unknown SSH host keys"""
+        
+        def __init__(self, hostname, key_type, key_fingerprint, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle("SSH Host Key Verification")
+            self.setModal(True)
+            self.resize(500, 300)
+            
+            layout = QVBoxLayout(self)
+            
+            # Warning message
+            warning_label = QLabel("WARNING: Unknown SSH host key detected!")
+            warning_label.setStyleSheet("color: red; font-weight: bold;")
+            layout.addWidget(warning_label)
+            
+            # Host information
+            info_text = f"""
+    The authenticity of host '{hostname}' can't be established.
+    {key_type} key fingerprint is:
+    {key_fingerprint}
+
+    Are you sure you want to continue connecting?
+    """
+            info_label = QLabel(info_text)
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label)
+            
+            # Key details
+            key_details = QTextEdit()
+            key_details.setPlainText(f"Host: {hostname}\nKey Type: {key_type}\nFingerprint: {key_fingerprint}")
+            key_details.setReadOnly(True)
+            key_details.setMaximumHeight(100)
+            layout.addWidget(key_details)
+            
+            # Save option
+            save_label = QLabel("If you choose 'Yes', the key will be saved to your known_hosts file for future connections.")
+            save_label.setWordWrap(True)
+            save_label.setStyleSheet("font-style: italic;")
+            layout.addWidget(save_label)
+            
+            # Buttons
+            button_layout = QHBoxLayout()
+            
+            self.yes_button = QPushButton("Yes, accept and save key")
+            self.yes_button.clicked.connect(self.accept)
+            self.yes_button.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+            
+            self.no_button = QPushButton("No, reject connection")
+            self.no_button.clicked.connect(self.reject)
+            self.no_button.setStyleSheet("background-color: #f44336; color: white; font-weight: bold;")
+            
+            button_layout.addWidget(self.no_button)
+            button_layout.addWidget(self.yes_button)
+            layout.addLayout(button_layout)
+            
+            # Default to No for security
+            self.no_button.setDefault(True)
+            self.no_button.setFocus()
+
 except ImportError:
     PYQT_AVAILABLE = False
+    
+    # Define a dummy class when PyQt6 is not available
+    class HostKeyVerificationDialog:
+        def __init__(self, *args, **kwargs):
+            pass
+
+
+def save_host_key_to_known_hosts(hostname, key):
+    """Save a host key to the user's known_hosts file"""
+    try:
+        # Get the user's .ssh directory
+        ssh_dir = os.path.expanduser("~/.ssh")
+        if not os.path.exists(ssh_dir):
+            os.makedirs(ssh_dir, mode=0o700)
+        
+        known_hosts_path = os.path.join(ssh_dir, "known_hosts")
+        
+        # Format the key entry
+        key_type = key.get_name()
+        key_data = key.get_base64()
+        key_entry = f"{hostname} {key_type} {key_data}\n"
+        
+        # Append to known_hosts file
+        with open(known_hosts_path, "a") as f:
+            f.write(key_entry)
+        
+        print(f"Host key for {hostname} saved to {known_hosts_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving host key: {e}")
+        return False
+
+
+def get_key_fingerprint(key):
+    """Get the fingerprint of an SSH key"""
+    try:
+        # Get the key in the format needed for fingerprinting
+        key_data = base64.b64decode(key.get_base64())
+        
+        # Create SHA256 fingerprint
+        digest = hashlib.sha256(key_data).digest()
+        fingerprint = base64.b64encode(digest).decode().rstrip('=')
+        
+        return f"SHA256:{fingerprint}"
+    except Exception as e:
+        print(f"Error generating fingerprint: {e}")
+        return f"(Unable to generate fingerprint: {e})"
 
 
 class KnownHostKeyPolicy(paramiko.MissingHostKeyPolicy):
@@ -31,7 +140,7 @@ class KnownHostKeyPolicy(paramiko.MissingHostKeyPolicy):
     
     def missing_host_key(self, client, hostname, key):
         """
-        Check if the host key matches any of our known hardcoded keys
+        Check if the host key matches any of our known hardcoded keys, or ask user to accept
         """
         key_type = key.get_name()
         key_data = key.get_base64()
@@ -42,8 +151,32 @@ class KnownHostKeyPolicy(paramiko.MissingHostKeyPolicy):
                 print(f"Host key verified for {hostname} using known keys")
                 return  # Accept the key
         
-        # If no match found, reject
-        raise paramiko.SSHException(f"Host key verification failed for {hostname} - unknown host key")
+        # If no match found, ask user if PyQt6 is available
+        if PYQT_AVAILABLE:
+            try:
+                fingerprint = get_key_fingerprint(key)
+                dialog = HostKeyVerificationDialog(hostname, key_type, fingerprint)
+                result = dialog.exec()
+                
+                if result == QDialog.Accepted:
+                    # User accepted the key, save it to known_hosts
+                    if save_host_key_to_known_hosts(hostname, key):
+                        print(f"Host key accepted and saved for {hostname}")
+                        return  # Accept the key
+                    else:
+                        print(f"Warning: Host key accepted but could not be saved for {hostname}")
+                        return  # Accept anyway
+                else:
+                    # User rejected the key
+                    raise paramiko.SSHException(f"Host key verification failed for {hostname} - user rejected unknown host key")
+                    
+            except Exception as e:
+                # If there's an error with the dialog, fall back to rejection
+                print(f"Error showing host key dialog: {e}")
+                raise paramiko.SSHException(f"Host key verification failed for {hostname} - unknown host key")
+        else:
+            # If PyQt6 is not available, reject as before
+            raise paramiko.SSHException(f"Host key verification failed for {hostname} - unknown host key")
 
 
 class SSHTunnelForwarder:
