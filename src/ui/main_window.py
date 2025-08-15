@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel, QComboBox, QFileDialog,
                              QListWidget, QMessageBox, QSplitter, QGroupBox, QScrollArea, QLineEdit, QProgressBar)
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QThread
-from src.utils.ssh import submit_files, connect_to_proxy
+from src.utils.ssh import submit_files, connect_to_proxy, validate_files
 from src.ui.about_window import AboutWindow
 
 class UploadWorker(QObject):
@@ -223,11 +223,43 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Submission Error", "Please enter an assignment name.")
             return
 
+        # Validate files before submission
+        valid_files, invalid_files, error_messages = validate_files(self.selected_files)
+        
+        if invalid_files:
+            # Show file validation errors
+            error_dialog = QMessageBox(self)
+            error_dialog.setIcon(QMessageBox.Icon.Warning)
+            error_dialog.setWindowTitle("File Validation Errors")
+            
+            if valid_files:
+                # Some files are valid
+                error_dialog.setText(f"Found {len(invalid_files)} invalid file(s). Do you want to continue with the {len(valid_files)} valid file(s)?")
+                error_dialog.setDetailedText("\n".join(error_messages))
+                error_dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                error_dialog.setDefaultButton(QMessageBox.StandardButton.No)
+                
+                reply = error_dialog.exec()
+                if reply != QMessageBox.StandardButton.Yes:
+                    return
+                
+                # Update files list to only include valid files
+                files_to_submit = valid_files
+            else:
+                # No valid files
+                error_dialog.setText("All selected files are invalid and cannot be submitted.")
+                error_dialog.setDetailedText("\n".join(error_messages))
+                error_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+                error_dialog.exec()
+                return
+        else:
+            files_to_submit = valid_files
+
         # Confirmation dialog
         reply = QMessageBox.question(
             self,
             "Confirm Submission",
-            f"Are you sure you want to submit {len(self.selected_files)} file(s) for assignment '{assignment}'?",
+            f"Are you sure you want to submit {len(files_to_submit)} file(s) for assignment '{assignment}'?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
@@ -255,7 +287,7 @@ class MainWindow(QMainWindow):
                 self.username,
                 self.password,
                 assignment,
-                self.selected_files,
+                files_to_submit,  # Use validated files
                 self.temp_dir,
                 self.ssh
             )
@@ -318,6 +350,26 @@ class MainWindow(QMainWindow):
         self.submit_btn.setEnabled(True)
 
         if success:
-            QMessageBox.information(self, "Success", message)
+            # Parse message to see if there were warnings
+            if message.startswith("Warning:"):
+                # Success but with warnings
+                QMessageBox.information(self, "Success with Warnings", message)
+            else:
+                QMessageBox.information(self, "Success", message)
         else:
-            QMessageBox.critical(self, "Submission Error", message)
+            # Create a detailed error dialog
+            error_dialog = QMessageBox(self)
+            error_dialog.setIcon(QMessageBox.Icon.Critical)
+            error_dialog.setWindowTitle("Submission Error")
+            
+            # Split message into main message and technical details if available
+            parts = message.split("\n\nTechnical details:\n", 1)
+            main_message = parts[0]
+            
+            error_dialog.setText(main_message)
+            
+            if len(parts) > 1:
+                error_dialog.setDetailedText(parts[1])
+            
+            error_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+            error_dialog.exec()
