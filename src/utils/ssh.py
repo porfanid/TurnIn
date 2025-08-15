@@ -249,7 +249,8 @@ def connect_to_proxy(username, password, proxy_host):
         proxy_host (str): Proxy hostname
 
     Returns:
-        tuple: (success (bool), host_to_connect (str), ssh_client (paramiko.SSHClient))
+        tuple: (success (bool), host_to_connect (str), ssh_client (paramiko.SSHClient), error_type (str))
+        error_type can be: None (success), 'auth' (authentication failed), 'timeout' (connection timeout), 'other' (other errors)
     """
     ssh = None
     try:
@@ -277,16 +278,16 @@ def connect_to_proxy(username, password, proxy_host):
                     print("Error: No available hosts found. Aborting...")
             else:
                 print("Error: No available hosts found. Aborting...")
-            return False, None, None
+            return False, None, None, 'other'
 
-        return True, host_to_connect, ssh
+        return True, host_to_connect, ssh, None
     except paramiko.AuthenticationException:
         if ssh:
             try:
                 ssh.close()
             except:
                 pass
-        return False, None, None
+        return False, None, None, 'auth'
     except paramiko.ssh_exception.SSHException as e:
         if ssh:
             try:
@@ -296,8 +297,10 @@ def connect_to_proxy(username, password, proxy_host):
         # Handle specific banner timeout errors more gracefully
         if "banner" in str(e).lower() or "timeout" in str(e).lower():
             error_msg = f"SSH connection timed out. Please check your network connection and try again."
+            error_type = 'timeout'
         else:
             error_msg = f"SSH Error: {e}"
+            error_type = 'other'
         
         if PYQT_AVAILABLE:
             try:
@@ -306,7 +309,7 @@ def connect_to_proxy(username, password, proxy_host):
                 print(error_msg)
         else:
             print(error_msg)
-        return False, None, None
+        return False, None, None, error_type
     except (socket.timeout, OSError, ConnectionError) as e:
         if ssh:
             try:
@@ -321,7 +324,7 @@ def connect_to_proxy(username, password, proxy_host):
                 print(error_msg)
         else:
             print(error_msg)
-        return False, None, None
+        return False, None, None, 'timeout'
     except Exception as e:
         if ssh:
             try:
@@ -336,7 +339,7 @@ def connect_to_proxy(username, password, proxy_host):
                 print(error_msg)
         else:
             print(error_msg)
-        return False, None, None
+        return False, None, None, 'other'
 
 def upload_files(files, username, password, ssh, host, temp_dir, progress_callback=None):
     """Upload files with progress reporting using existing SSH connection"""
@@ -407,7 +410,17 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
                  file_list, temp_dir, ssh_client=None, progress_callback=None):
     """Submit files to the assignment submission server"""
     # Use existing SSH client or create a new one
-    ssh = ssh_client or connect_to_proxy(username, password, proxy_host)[2]
+    if ssh_client:
+        ssh = ssh_client
+    else:
+        result, _, ssh, error_type = connect_to_proxy(username, password, proxy_host)
+        if not result:
+            if error_type == 'timeout':
+                return False, "SSH connection timed out. Please check your network connection and try again."
+            elif error_type == 'auth':
+                return False, "Authentication failed. Please check your credentials."
+            else:
+                return False, "Connection failed. Please try again."
 
     if progress_callback:
         try:

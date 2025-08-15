@@ -3,7 +3,7 @@ Login window for the TurnIn application
 """
 import os
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QGridLayout,
-                            QLabel, QLineEdit, QPushButton, QMessageBox)
+                            QLabel, QLineEdit, QPushButton, QMessageBox, QApplication)
 
 
 from ..utils.credential_manager import save_credentials, load_credentials
@@ -96,10 +96,22 @@ class LoginWindow(QMainWindow):
 
     def perform_login(self, username, password, from_saved=False):
         """Perform the actual login process"""
-        result, host_to_connect, ssh = connect_to_proxy(username, password, PROXY_HOST)
+        result, host_to_connect, ssh, error_type = connect_to_proxy(username, password, PROXY_HOST)
 
         if not result:
-            QMessageBox.warning(self, "Login Error", "Authentication failed. Please check your credentials.")
+            # Handle different types of errors
+            if error_type == 'timeout':
+                # For timeout errors, exit the application immediately
+                QApplication.instance().quit()
+                return
+            elif error_type == 'auth':
+                QMessageBox.warning(self, "Login Error", "Authentication failed. Please check your credentials.")
+            else:
+                QMessageBox.warning(self, "Login Error", "Connection failed. Please try again.")
+            
+            # If we're using saved credentials and authentication failed, show the login window again
+            if from_saved:
+                self.show()
             return
 
         # Only ask to save credentials if they weren't loaded from saved credentials

@@ -98,12 +98,13 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.exec_command.return_value = (None, mock_stdout, None)
 
         # Call the function
-        success, host, ssh = connect_to_proxy("user", "pass", "proxy.host")
+        success, host, ssh, error_type = connect_to_proxy("user", "pass", "proxy.host")
 
         # Verify results
         self.assertTrue(success)
         self.assertEqual(host, "dl-server")
         self.assertEqual(ssh, mock_ssh)
+        self.assertIsNone(error_type)
         mock_ssh.connect.assert_called_once_with("proxy.host", username="user", password="pass", timeout=15, banner_timeout=10, allow_agent=False, look_for_keys=False)
 
     @patch('utils.ssh.paramiko.SSHClient')
@@ -120,12 +121,13 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.exec_command.return_value = (None, mock_stdout, None)
 
         # Call the function
-        success, host, ssh = connect_to_proxy("user", "pass", "proxy.host")
+        success, host, ssh, error_type = connect_to_proxy("user", "pass", "proxy.host")
 
         # Verify results
         self.assertFalse(success)
         self.assertIsNone(host)
         self.assertIsNone(ssh)
+        self.assertEqual(error_type, 'other')
 
     @patch('utils.ssh.paramiko.SSHClient')
     def test_connect_to_proxy_auth_error(self, mock_ssh_client):
@@ -136,12 +138,13 @@ class TestSSHUtils(unittest.TestCase):
         mock_ssh.connect.side_effect = paramiko.AuthenticationException()
 
         # Call the function
-        success, host, ssh = connect_to_proxy("user", "pass", "proxy.host")
+        success, host, ssh, error_type = connect_to_proxy("user", "pass", "proxy.host")
 
         # Verify results
         self.assertFalse(success)
         self.assertIsNone(host)
         self.assertIsNone(ssh)
+        self.assertEqual(error_type, 'auth')
 
     def test_upload_files(self):
         """Test uploading files to remote server using existing SSH connection"""
