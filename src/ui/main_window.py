@@ -334,9 +334,12 @@ class MainWindow(QMainWindow):
             self.worker.set_user_response("")
 
     def display_command_output(self, text):
-        """Display command output in the output area"""
-        self.output_text.setText(text)
-        self.output_area.show()
+        """Display command output in the interactive dialog if available"""
+        if hasattr(self, 'interactive_dialog'):
+            # Add final output to the interactive dialog
+            self.interactive_dialog.add_output(f"\n--- Final Command Output ---\n{text}")
+        # If no interactive dialog exists, we'll just skip this
+        # since the output is already shown through the interactive_output signal
 
     def setup_progress_ui(self):
         """Set up progress bar and status label"""

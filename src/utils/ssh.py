@@ -76,16 +76,42 @@ class SSHTunnelForwarder:
         # Create SSH connection
         self._ssh_client = paramiko.SSHClient()
         add_ssh_keys(self._ssh_client)
-        self._ssh_client.connect(
-            self.ssh_host,
-            port=self.ssh_port,
-            username=self.ssh_username,
-            password=self.ssh_password,
-            timeout=15,
-            banner_timeout=10,
-            allow_agent=False,  # Disable SSH agent key usage
-            look_for_keys=False  # Disable automatic private key discovery
-        )
+        
+        try:
+            # Try password authentication first
+            self._ssh_client.connect(
+                self.ssh_host,
+                port=self.ssh_port,
+                username=self.ssh_username,
+                password=self.ssh_password,
+                timeout=15,
+                banner_timeout=10,
+                allow_agent=False,  # Disable SSH agent key usage
+                look_for_keys=False  # Disable automatic private key discovery
+            )
+        except paramiko.AuthenticationException:
+            # Try keyboard-interactive authentication as fallback
+            try:
+                self._ssh_client.close()
+                self._ssh_client = paramiko.SSHClient()
+                add_ssh_keys(self._ssh_client)
+                
+                # Connect without authentication first
+                transport = paramiko.Transport((self.ssh_host, self.ssh_port))
+                transport.connect()
+                
+                # Try keyboard-interactive authentication
+                def auth_handler(title, instructions, prompt_list):
+                    # For keyboard-interactive, return the password for all prompts
+                    if prompt_list:
+                        return [self.ssh_password] * len(prompt_list)
+                    return []
+                
+                transport.auth_interactive(self.ssh_username, auth_handler)
+                self._ssh_client._transport = transport
+            except:
+                # If both methods fail, re-raise the original auth exception
+                raise paramiko.AuthenticationException("Authentication failed with both password and keyboard-interactive methods")
         
         # Create local socket
         self._local_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -241,7 +267,7 @@ def get_available_server(ssh):
 
 def connect_to_proxy(username, password, proxy_host):
     """
-    Connect to the SSH proxy
+    Connect to the SSH proxy with support for both password and keyboard-interactive authentication
 
     Args:
         username (str): SSH username
@@ -265,7 +291,8 @@ def connect_to_proxy(username, password, proxy_host):
             timeout=15,  # Reduced to 15 second connection timeout
             banner_timeout=10,  # Reduced to 10 second banner timeout
             allow_agent=False,  # Disable SSH agent key usage
-            look_for_keys=False  # Disable automatic private key discovery
+            look_for_keys=False,  # Disable automatic private key discovery
+            auth_timeout=30  # Set authentication timeout
         )
 
         # Find available host
@@ -282,12 +309,56 @@ def connect_to_proxy(username, password, proxy_host):
 
         return True, host_to_connect, ssh, None
     except paramiko.AuthenticationException:
-        if ssh:
-            try:
+        # Try keyboard-interactive authentication as fallback
+        try:
+            if ssh:
                 ssh.close()
+            ssh = paramiko.SSHClient()
+            add_ssh_keys(ssh)
+            
+            # Connect without authentication first
+            transport = paramiko.Transport((proxy_host, 22))
+            transport.connect()
+            
+            # Try keyboard-interactive authentication
+            try:
+                def auth_handler(title, instructions, prompt_list):
+                    # For keyboard-interactive, return the password for all prompts
+                    if prompt_list:
+                        return [password] * len(prompt_list)
+                    return []
+                
+                transport.auth_interactive(username, auth_handler)
+                ssh._transport = transport
+                
+                # Find available host
+                host_to_connect = get_available_server(ssh)
+                if not host_to_connect:
+                    if PYQT_AVAILABLE:
+                        try:
+                            QMessageBox.critical(None, "Error", "No available hosts found. Aborting...")
+                        except:
+                            print("Error: No available hosts found. Aborting...")
+                    else:
+                        print("Error: No available hosts found. Aborting...")
+                    return False, None, None, 'other'
+
+                return True, host_to_connect, ssh, None
             except:
-                pass
-        return False, None, None, 'auth'
+                # If keyboard-interactive also fails, return auth error
+                if ssh:
+                    try:
+                        ssh.close()
+                    except:
+                        pass
+                return False, None, None, 'auth'
+        except:
+            if ssh:
+                try:
+                    ssh.close()
+                except:
+                    pass
+            return False, None, None, 'auth'
     except paramiko.ssh_exception.SSHException as e:
         if ssh:
             try:
@@ -456,15 +527,35 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
             target_ssh = paramiko.SSHClient()
             add_ssh_keys(target_ssh)
 
-            # Connect through the tunnel with timeout
-            target_ssh.connect('127.0.0.1',
-                             port=tunnel.local_bind_port,
-                             username=username,
-                             password=password,
-                             timeout=15,  # Reduced to 15 second connection timeout
-                             banner_timeout=10,  # Reduced to 10 second banner timeout
-                             allow_agent=False,  # Disable SSH agent key usage
-                             look_for_keys=False)  # Disable automatic private key discovery
+            # Connect through the tunnel with timeout and fallback authentication
+            try:
+                target_ssh.connect('127.0.0.1',
+                                 port=tunnel.local_bind_port,
+                                 username=username,
+                                 password=password,
+                                 timeout=15,  # Reduced to 15 second connection timeout
+                                 banner_timeout=10,  # Reduced to 10 second banner timeout
+                                 allow_agent=False,  # Disable SSH agent key usage
+                                 look_for_keys=False)  # Disable automatic private key discovery
+            except paramiko.AuthenticationException:
+                # Try keyboard-interactive authentication as fallback
+                target_ssh.close()
+                target_ssh = paramiko.SSHClient()
+                add_ssh_keys(target_ssh)
+                
+                # Connect without authentication first
+                transport = paramiko.Transport(('127.0.0.1', tunnel.local_bind_port))
+                transport.connect()
+                
+                # Try keyboard-interactive authentication
+                def auth_handler(title, instructions, prompt_list):
+                    # For keyboard-interactive, return the password for all prompts
+                    if prompt_list:
+                        return [password] * len(prompt_list)
+                    return []
+                
+                transport.auth_interactive(username, auth_handler)
+                target_ssh._transport = transport
 
             if progress_callback:
                 try:
