@@ -4,17 +4,178 @@ SSH utilities for handling connections and file transfers
 import os
 import paramiko
 import sshtunnel
-from PyQt6.QtWidgets import QMessageBox
+import hashlib
+import base64
+
+# Try to import PyQt6 widgets, but handle gracefully if not available
+try:
+    from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QApplication
+    PYQT_AVAILABLE = True
+except ImportError:
+    PYQT_AVAILABLE = False
+
+
+class SecureHostKeyPolicy(paramiko.MissingHostKeyPolicy):
+    """
+    Custom host key policy that prompts user for verification and saves accepted keys
+    """
+    
+    def missing_host_key(self, client, hostname, key):
+        """
+        Called when an unknown host key is encountered.
+        Shows the key fingerprint to the user and asks for confirmation.
+        """
+        # Generate key fingerprint
+        key_type = key.get_name()
+        key_data = key.get_base64()
+        
+        # Generate SHA256 fingerprint (modern standard)
+        key_bytes = base64.b64decode(key_data)
+        sha256_hash = hashlib.sha256(key_bytes).digest()
+        sha256_fingerprint = base64.b64encode(sha256_hash).decode().rstrip('=')
+        
+        # Generate MD5 fingerprint (legacy, for compatibility)
+        md5_hash = hashlib.md5(key_bytes).digest()
+        md5_fingerprint = ':'.join(f'{b:02x}' for b in md5_hash)
+        
+        # Create verification dialog
+        if PYQT_AVAILABLE:
+            try:
+                if QApplication.instance() is not None:
+                    # GUI mode - show dialog
+                    dialog = QDialog()
+                    dialog.setWindowTitle("SSH Host Key Verification")
+                    dialog.setModal(True)
+                    
+                    layout = QVBoxLayout()
+                    
+                    # Warning message
+                    warning_label = QLabel(
+                        f"<b>WARNING: Unknown SSH host key for {hostname}</b><br><br>"
+                        f"The authenticity of host '{hostname}' can't be established.<br>"
+                        f"Key type: {key_type}<br><br>"
+                        f"SHA256 fingerprint: {sha256_fingerprint}<br>"
+                        f"MD5 fingerprint: {md5_fingerprint}<br><br>"
+                        f"Are you sure you want to continue connecting and save this key?"
+                    )
+                    warning_label.setWordWrap(True)
+                    layout.addWidget(warning_label)
+                    
+                    # Button layout
+                    button_layout = QHBoxLayout()
+                    accept_button = QPushButton("Accept and Save")
+                    reject_button = QPushButton("Reject")
+                    
+                    button_layout.addWidget(accept_button)
+                    button_layout.addWidget(reject_button)
+                    layout.addLayout(button_layout)
+                    
+                    dialog.setLayout(layout)
+                    
+                    # Connect button signals
+                    result = [False]  # Use list to allow modification in nested function
+                    
+                    def accept_key():
+                        result[0] = True
+                        dialog.accept()
+                    
+                    def reject_key():
+                        result[0] = False
+                        dialog.reject()
+                    
+                    accept_button.clicked.connect(accept_key)
+                    reject_button.clicked.connect(reject_key)
+                    
+                    # Show dialog and get result
+                    if dialog.exec() == QDialog.DialogCode.Accepted and result[0]:
+                        # User accepted - save the key
+                        self._save_host_key(hostname, key)
+                        return
+                    else:
+                        # User rejected
+                        raise paramiko.SSHException(f"Host key verification failed for {hostname}")
+                else:
+                    # Console mode fallback
+                    self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
+            except Exception:
+                # Fallback to console if GUI fails
+                self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
+        else:
+            # PyQt6 not available - use console prompt
+            self._console_prompt(hostname, key_type, sha256_fingerprint, md5_fingerprint, key)
+    
+    def _console_prompt(self, hostname, key_type, sha256_fingerprint, md5_fingerprint, key):
+        """
+        Console-based prompt for host key verification
+        """
+        print(f"\nWARNING: Unknown SSH host key for {hostname}")
+        print(f"The authenticity of host '{hostname}' can't be established.")
+        print(f"Key type: {key_type}")
+        print(f"SHA256 fingerprint: {sha256_fingerprint}")
+        print(f"MD5 fingerprint: {md5_fingerprint}")
+        
+        while True:
+            response = input("Are you sure you want to continue connecting? (yes/no): ").lower().strip()
+            if response in ['yes', 'y']:
+                # Save the key and continue
+                self._save_host_key(hostname, key)
+                return
+            elif response in ['no', 'n']:
+                raise paramiko.SSHException(f"Host key verification failed for {hostname}")
+            else:
+                print("Please type 'yes' or 'no'")
+    
+    def _save_host_key(self, hostname, key):
+        """
+        Save the accepted host key to the user's known_hosts file
+        """
+        try:
+            # Get the user's known_hosts file path
+            known_hosts_path = os.path.expanduser("~/.ssh/known_hosts")
+            
+            # Ensure .ssh directory exists
+            ssh_dir = os.path.dirname(known_hosts_path)
+            os.makedirs(ssh_dir, mode=0o700, exist_ok=True)
+            
+            # Format the host key entry
+            key_type = key.get_name()
+            key_data = key.get_base64()
+            host_key_entry = f"{hostname} {key_type} {key_data}\n"
+            
+            # Append to known_hosts file
+            with open(known_hosts_path, 'a') as f:
+                f.write(host_key_entry)
+            
+            print(f"Host key for {hostname} saved to {known_hosts_path}")
+            
+        except Exception as e:
+            print(f"Warning: Could not save host key to known_hosts: {e}")
+
 
 def add_ssh_keys(ssh):
     """
-    Add known SSH host keys to the client
+    Add known SSH host keys to the client using secure practices
 
     Args:
         ssh (paramiko.SSHClient): The SSH client to configure
     """
-    # This needs to be fixed to not rely on SSH_KEYS from config
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    # Load system and user known_hosts files
+    try:
+        # Load system-wide known_hosts
+        ssh.load_system_host_keys()
+    except Exception as e:
+        print(f"Warning: Could not load system host keys: {e}")
+    
+    try:
+        # Load user's known_hosts file
+        user_known_hosts = os.path.expanduser("~/.ssh/known_hosts")
+        if os.path.exists(user_known_hosts):
+            ssh.load_host_keys(user_known_hosts)
+    except Exception as e:
+        print(f"Warning: Could not load user host keys: {e}")
+    
+    # Set secure host key policy
+    ssh.set_missing_host_key_policy(SecureHostKeyPolicy())
 
 def get_available_server(ssh):
     """
@@ -56,14 +217,26 @@ def connect_to_proxy(username, password, proxy_host):
         # Find available host
         host_to_connect = get_available_server(ssh)
         if not host_to_connect:
-            QMessageBox.critical(None, "Error", "No available hosts found. Aborting...")
+            if PYQT_AVAILABLE:
+                try:
+                    QMessageBox.critical(None, "Error", "No available hosts found. Aborting...")
+                except:
+                    print("Error: No available hosts found. Aborting...")
+            else:
+                print("Error: No available hosts found. Aborting...")
             return False, None, None
 
         return True, host_to_connect, ssh
     except paramiko.AuthenticationException:
         return False, None, None
     except paramiko.ssh_exception.SSHException as e:
-        QMessageBox.critical(None, "SSH Error", str(e))
+        if PYQT_AVAILABLE:
+            try:
+                QMessageBox.critical(None, "SSH Error", str(e))
+            except:
+                print(f"SSH Error: {e}")
+        else:
+            print(f"SSH Error: {e}")
         return False, None, None
 
 def upload_files(files, username, password, ssh, host, temp_dir, progress_callback=None):
@@ -163,7 +336,7 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
         ) as tunnel:
             # Create a new SSH client to connect to the tunneled host
             target_ssh = paramiko.SSHClient()
-            target_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            add_ssh_keys(target_ssh)
 
             # Connect through the tunnel
             target_ssh.connect('127.0.0.1',
