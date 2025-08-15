@@ -9,9 +9,6 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QGridLayout,
 from ..utils.credential_manager import save_credentials, load_credentials
 from ..utils.ssh import connect_to_proxy
 from ..config import PROXY_HOST, TEMP_DIR
-from src.utils.credential_manager import save_credentials, load_credentials, clear_credentials
-from src.utils.ssh import connect_to_proxy
-from src.config import PROXY_HOST, TEMP_DIR
 
 class LoginWindow(QMainWindow):
     """
