@@ -2,6 +2,7 @@
 SSH utilities for handling connections and file transfers
 """
 import os
+import socket
 import paramiko
 import sshtunnel
 import hashlib
@@ -277,6 +278,7 @@ def connect_to_proxy(username, password, proxy_host):
     Returns:
         tuple: (success (bool), host_to_connect (str), ssh_client (paramiko.SSHClient))
     """
+    ssh = None
     try:
         ssh = paramiko.SSHClient()
         add_ssh_keys(ssh)
@@ -286,8 +288,8 @@ def connect_to_proxy(username, password, proxy_host):
             proxy_host, 
             username=username, 
             password=password, 
-            timeout=30,  # 30 second connection timeout
-            banner_timeout=20  # 20 second banner timeout
+            timeout=15,  # Reduced to 15 second connection timeout
+            banner_timeout=10  # Reduced to 10 second banner timeout
         )
 
         # Find available host
@@ -304,9 +306,24 @@ def connect_to_proxy(username, password, proxy_host):
 
         return True, host_to_connect, ssh
     except paramiko.AuthenticationException:
+        if ssh:
+            try:
+                ssh.close()
+            except:
+                pass
         return False, None, None
     except paramiko.ssh_exception.SSHException as e:
-        error_msg = f"SSH Error: {e}"
+        if ssh:
+            try:
+                ssh.close()
+            except:
+                pass
+        # Handle specific banner timeout errors more gracefully
+        if "banner" in str(e).lower() or "timeout" in str(e).lower():
+            error_msg = f"SSH connection timed out. Please check your network connection and try again."
+        else:
+            error_msg = f"SSH Error: {e}"
+        
         if PYQT_AVAILABLE:
             try:
                 QMessageBox.critical(None, "SSH Error", error_msg)
@@ -315,7 +332,27 @@ def connect_to_proxy(username, password, proxy_host):
         else:
             print(error_msg)
         return False, None, None
+    except (socket.timeout, OSError, ConnectionError) as e:
+        if ssh:
+            try:
+                ssh.close()
+            except:
+                pass
+        error_msg = f"Network connection failed: {e}"
+        if PYQT_AVAILABLE:
+            try:
+                QMessageBox.critical(None, "Connection Error", error_msg)
+            except:
+                print(error_msg)
+        else:
+            print(error_msg)
+        return False, None, None
     except Exception as e:
+        if ssh:
+            try:
+                ssh.close()
+            except:
+                pass
         error_msg = f"Connection Error: {e}"
         if PYQT_AVAILABLE:
             try:
@@ -430,8 +467,8 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
                              port=tunnel.local_bind_port,
                              username=username,
                              password=password,
-                             timeout=30,  # 30 second connection timeout
-                             banner_timeout=20)  # 20 second banner timeout
+                             timeout=15,  # Reduced to 15 second connection timeout
+                             banner_timeout=10)  # Reduced to 10 second banner timeout
 
             if progress_callback:
                 try:
@@ -465,5 +502,12 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
                 return False, f"Error updating progress bar: {str(e)}"
 
         return True, output
+    except paramiko.ssh_exception.SSHException as e:
+        if "banner" in str(e).lower() or "timeout" in str(e).lower():
+            return False, f"SSH connection timed out during submission. Please check your network connection and try again."
+        else:
+            return False, f"SSH error during submission: {str(e)}"
+    except (socket.timeout, OSError, ConnectionError) as e:
+        return False, f"Network connection failed during submission: {str(e)}"
     except Exception as e:
         return False, f"Error executing turnin command: {str(e)}"
