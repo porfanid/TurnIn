@@ -7,7 +7,7 @@ pkgdesc="TurnIn App"
 arch=('any')
 url="https://github.com/yourusername/your-repo"
 license=('MIT')
-depends=('python-sshtunnel' 'python-paramiko' 'python-sentry-sdk' 'python-pyqt5' 'python-keyring' 'python-requests')
+depends=('python-sshtunnel' 'python-paramiko' 'python-sentry-sdk' 'python-pyqt6' 'python-keyring' 'python-requests')
 
 source=("$url/archive/v$pkgver.tar.gz")
 
