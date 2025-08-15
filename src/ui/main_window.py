@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel, QComboBox, QFileDialog,
                              QListWidget, QMessageBox, QSplitter, QGroupBox, QScrollArea, QLineEdit, QProgressBar)
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QThread
-from src.utils.ssh import submit_files, connect_to_proxy
-from src.ui.about_window import AboutWindow
+from .utils.ssh import submit_files, connect_to_proxy
+from .ui.about_window import AboutWindow
 
 class UploadWorker(QObject):
     """Worker to handle file uploads in a background thread"""
