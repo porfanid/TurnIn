@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QGridLayout,
                             QLabel, QLineEdit, QPushButton, QMessageBox)
 
 
-from src.utils.credential_manager import save_credentials, load_credentials
+from src.utils.credential_manager import save_credentials, load_credentials, clear_credentials
 from src.utils.ssh import connect_to_proxy
 from src.config import PROXY_HOST, TEMP_DIR
 
@@ -17,7 +17,7 @@ class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("TurnIn - Login")
-        self.resize(400, 150)
+        self.resize(400, 200)
 
         # Create central widget
         central_widget = QWidget()
@@ -53,11 +53,42 @@ class LoginWindow(QMainWindow):
         form_layout.addWidget(button_login, 2, 0, 1, 2)
         form_layout.setRowMinimumHeight(2, 50)
 
+        # Clear saved credentials button
+        button_clear = QPushButton('Διαγραφή Αποθηκευμένων Διαπιστευτηρίων')
+        button_clear.clicked.connect(self.clear_saved_credentials)
+        form_layout.addWidget(button_clear, 3, 0, 1, 2)
+        form_layout.setRowMinimumHeight(3, 50)
+
         # Connect enter key to login function
         self.lineEdit_password.returnPressed.connect(self.login)
         self.lineEdit_username.returnPressed.connect(self.login)
 
         main_layout.addLayout(form_layout)
+
+    def clear_saved_credentials(self):
+        """Clear saved credentials after user confirmation"""
+        reply = QMessageBox.question(
+            self,
+            "Διαγραφή Διαπιστευτηρίων",
+            "Είστε σίγουροι ότι θέλετε να διαγράψετε τα αποθηκευμένα διαπιστευτήρια;\n\n"
+            "Θα χρειαστεί να συνδεθείτε ξανά στην επόμενη χρήση.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if clear_credentials():
+                QMessageBox.information(
+                    self,
+                    "Επιτυχής Διαγραφή",
+                    "Τα αποθηκευμένα διαπιστευτήρια διαγράφηκαν επιτυχώς."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Σφάλμα Διαγραφής",
+                    "Υπήρξε πρόβλημα κατά τη διαγραφή των διαπιστευτηρίων.\n"
+                    "Παρακαλώ δοκιμάστε ξανά."
+                )
 
     def check_saved_credentials(self):
         """Check for saved credentials and offer to use them"""
