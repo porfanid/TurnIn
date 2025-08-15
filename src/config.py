@@ -11,7 +11,8 @@ PROXY_HOST = "scylla.cs.uoi.gr"
 TEMP_DIR = "turnin"
 LOCAL_TUNNEL_PORT = 10022
 
-# SSH Host Keys
+# SSH Host Keys (DEPRECATED - no longer used, kept for backwards compatibility)
+# The application now uses the system's ~/.ssh/known_hosts file for secure host key management
 SSH_KEYS = [
     ("scylla.cs.uoi.gr", "ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABAQC4FBvewUk/bWUNOZ4ZQEQ76+Rlodr/ZPDCTPcWhHL+Z4z3plDo/BMoEs21vtsFviI4XDOntQXzUlgG8Ro0xk8tNmXztG9C5AHhl0g6axyvFyRy6hFDx1K+LFWaF7KdtdfOtAUdeP4DRPr+wX9dL6M0j/D5OVGaY3SQD+YJMed8IjmWgqOxMTjSerluTET/L0+VBo82ng2Y/dYxLLFAtimkbzfK0tgEd61cayo4Aymt3XHSBmDQm7g9nnrFMLIyYEFsMoBy7vrOOFSYvP0ejIeLOzHxlUKs9SzKDXiISDfXfLPGzoNjw7t3UpgnAv+Zb+gk4O+iMVAgCGubBuFu6iq3"),
     ("scylla.cs.uoi.gr", "ecdsa-sha2-nistp256", "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHRcr33y6VL9eRyZRetzPWKHW2Djp6loH+/Kw0bckdR7lkiLGFlfcZ8jXhlvf9ieglZkqgH0xTOE6Pwq4F1CweA="),
