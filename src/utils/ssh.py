@@ -82,7 +82,9 @@ class SSHTunnelForwarder:
             username=self.ssh_username,
             password=self.ssh_password,
             timeout=15,
-            banner_timeout=10
+            banner_timeout=10,
+            allow_agent=False,  # Disable SSH agent key usage
+            look_for_keys=False  # Disable automatic private key discovery
         )
         
         # Create local socket
@@ -260,7 +262,9 @@ def connect_to_proxy(username, password, proxy_host):
             username=username, 
             password=password, 
             timeout=15,  # Reduced to 15 second connection timeout
-            banner_timeout=100  # Reduced to 10 second banner timeout
+            banner_timeout=10,  # Reduced to 10 second banner timeout
+            allow_agent=False,  # Disable SSH agent key usage
+            look_for_keys=False  # Disable automatic private key discovery
         )
 
         # Find available host
@@ -444,7 +448,9 @@ def submit_files(proxy_host, host_to_connect, username, password, assignment,
                              username=username,
                              password=password,
                              timeout=15,  # Reduced to 15 second connection timeout
-                             banner_timeout=10)  # Reduced to 10 second banner timeout
+                             banner_timeout=10,  # Reduced to 10 second banner timeout
+                             allow_agent=False,  # Disable SSH agent key usage
+                             look_for_keys=False)  # Disable automatic private key discovery
 
             if progress_callback:
                 try:
