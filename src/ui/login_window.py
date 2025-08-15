@@ -60,7 +60,11 @@ class LoginWindow(QMainWindow):
         main_layout.addLayout(form_layout)
 
     def check_saved_credentials(self):
-        """Check for saved credentials and offer to use them"""
+        """Check for saved credentials and offer to use them
+        
+        Returns:
+            str: 'success' if login succeeded, 'timeout' if connection timeout, 'show_login' if need to show login window
+        """
         credentials = load_credentials()
         if credentials:
             username, _ = credentials
@@ -74,14 +78,17 @@ class LoginWindow(QMainWindow):
             if reply == QMessageBox.StandardButton.Yes:
                 # Hide the login window immediately when using saved credentials
                 self.hide()
-                self.use_saved_credentials(credentials)
-                return True
-        return False
+                return self.use_saved_credentials(credentials)
+        return 'show_login'
 
     def use_saved_credentials(self, credentials):
-        """Use saved credentials to login"""
+        """Use saved credentials to login
+        
+        Returns:
+            str: 'success' if login succeeded, 'timeout' if connection timeout, 'auth_failed' if auth failed
+        """
         username, password = credentials
-        self.perform_login(username, password, from_saved=True)
+        return self.perform_login(username, password, from_saved=True)
 
     def login(self):
         """Handle login button click"""
@@ -95,7 +102,11 @@ class LoginWindow(QMainWindow):
         self.perform_login(username, password)
 
     def perform_login(self, username, password, from_saved=False):
-        """Perform the actual login process"""
+        """Perform the actual login process
+        
+        Returns:
+            str: 'success' if login succeeded, 'timeout' if connection timeout, 'auth_failed' if auth failed (only for saved credentials)
+        """
         result, host_to_connect, ssh, error_type = connect_to_proxy(username, password, PROXY_HOST)
 
         if not result:
@@ -103,7 +114,7 @@ class LoginWindow(QMainWindow):
             if error_type == 'timeout':
                 # For timeout errors, exit the application immediately
                 QApplication.instance().quit()
-                return
+                return 'timeout'
             elif error_type == 'auth':
                 QMessageBox.warning(self, "Login Error", "Authentication failed. Please check your credentials.")
             else:
@@ -112,7 +123,8 @@ class LoginWindow(QMainWindow):
             # If we're using saved credentials and authentication failed, show the login window again
             if from_saved:
                 self.show()
-            return
+                return 'auth_failed'
+            return 'auth_failed'
 
         # Only ask to save credentials if they weren't loaded from saved credentials
         if not from_saved:
@@ -139,3 +151,4 @@ class LoginWindow(QMainWindow):
 
         self.main_window.show()
         self.close()
+        return 'success'

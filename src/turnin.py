@@ -70,8 +70,18 @@ def main():
 
     # Show login window
     login_window = LoginWindow()
-    if not login_window.check_saved_credentials():
+    login_status = login_window.check_saved_credentials()
+    
+    # Handle different login statuses
+    if login_status == 'timeout':
+        # Exit immediately on timeout
+        logger.info("Application exiting due to SSH connection timeout")
+        return
+    elif login_status == 'show_login':
+        # Show login window for manual credentials entry
         login_window.show()
+    # If login_status == 'success', the main window is already shown and login window is hidden
+    
     logger.info("Application UI initialized and displayed")
 
     # Start application event loop
