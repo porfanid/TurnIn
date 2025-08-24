@@ -236,17 +236,6 @@ class MainWindow(QMainWindow):
             self.setup_progress_ui()
             self.submit_btn.setEnabled(False)
 
-            # Create output area if it doesn't exist
-            if not hasattr(self, 'output_area'):
-                self.output_area = QScrollArea()
-                self.output_text = QLabel()
-                self.output_text.setWordWrap(True)
-                self.output_area.setWidget(self.output_text)
-                self.output_area.setWidgetResizable(True)
-                main_layout = self.centralWidget().layout()
-                main_layout.insertWidget(main_layout.count() - 1, self.output_area)
-                self.output_area.hide()
-
             # Create worker and thread
             self.thread = QThread()
             self.worker = UploadWorker(
@@ -273,13 +262,14 @@ class MainWindow(QMainWindow):
             self.worker.upload_finished.connect(self.thread.quit)
             self.worker.upload_finished.connect(self.worker.deleteLater)
             self.thread.finished.connect(self.thread.deleteLater)
+            
             # Start the thread
             self.thread.start()
 
     def display_command_output(self, text):
-        """Display command output in the output area"""
-        self.output_text.setText(text)
-        self.output_area.show()
+        """Display command output"""
+        # Show output in a simple message box or status
+        print(f"Command output: {text}")
 
     def setup_progress_ui(self):
         """Set up progress bar and status label"""
@@ -305,7 +295,6 @@ class MainWindow(QMainWindow):
             main_layout.insertWidget(main_layout.count() - 1, self.progress_widget)
         # Show the progress widget
         self.progress_widget.show()
-        # Disable submit button during upload
 
     def update_progress(self, percent, message):
         """Update progress bar and status message"""
